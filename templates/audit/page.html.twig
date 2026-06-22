@@ -1,0 +1,176 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ report.url }} - {{ site.name }}{% endblock %}
+
+{% block body %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ path('audit_index') }}">Audit</a></li>
+        <li class="breadcrumb-item"><a href="{{ path('audit_site', {id: site.id}) }}">{{ site.name }}</a></li>
+        <li class="breadcrumb-item"><a href="{{ path('audit_analysis', {id: analysis.id}) }}">Analyse {{ analysis.createdAt|date('d/m/Y H:i') }}</a></li>
+        <li class="breadcrumb-item active text-truncate" style="max-width:300px;">{{ report.url }}</li>
+    </ol>
+</nav>
+
+<div class="mb-4">
+    <h1 class="h3 mb-1 text-break">{{ report.url }}</h1>
+    <span class="text-muted">HTTP {{ report.httpStatus }} &middot; le {{ report.createdAt|date('d/m/Y à H:i') }}</span>
+</div>
+
+<div class="row g-4">
+
+    {# Scores #}
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header"><h5 class="mb-0">Scores</h5></div>
+            <div class="card-body">
+                <div class="row text-center g-3">
+                    <div class="col-6 col-md-3">
+                        <div class="display-6 fw-bold {{ (report.lhPerformance ?? 0) >= 90 ? 'text-success' : (report.lhPerformance ?? 0) >= 50 ? 'text-warning' : 'text-danger' }}">
+                            {{ report.lhPerformance is not null ? report.lhPerformance|round : '-' }}
+                        </div>
+                        <div class="text-muted">Performance</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="display-6 fw-bold {{ (report.lhAccessibility ?? 0) >= 90 ? 'text-success' : (report.lhAccessibility ?? 0) >= 50 ? 'text-warning' : 'text-danger' }}">
+                            {{ report.lhAccessibility is not null ? report.lhAccessibility|round : '-' }}
+                        </div>
+                        <div class="text-muted">Accessibilité</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="display-6 fw-bold {{ (report.lhSeo ?? 0) >= 90 ? 'text-success' : (report.lhSeo ?? 0) >= 50 ? 'text-warning' : 'text-danger' }}">
+                            {{ report.lhSeo is not null ? report.lhSeo|round : '-' }}
+                        </div>
+                        <div class="text-muted">SEO</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="display-6 fw-bold {{ (report.rgaaScore ?? 0) >= 90 ? 'text-success' : (report.rgaaScore ?? 0) >= 50 ? 'text-warning' : 'text-danger' }}">
+                            {{ report.rgaaScore is not null ? report.rgaaScore|round : '-' }}
+                        </div>
+                        <div class="text-muted">RGAA</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# SEO #}
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header"><h5 class="mb-0"><i class="fa-solid fa-magnifying-glass"></i> SEO</h5></div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <th style="width:140px;">Titre</th>
+                        <td>{{ report.seoTitle ?: '<em class="text-muted">non défini</em>'|raw }}</td>
+                    </tr>
+                    <tr>
+                        <th>Méta description</th>
+                        <td>{{ report.seoDescription ?: '<em class="text-muted">non défini</em>'|raw }}</td>
+                    </tr>
+                    <tr>
+                        <th>H1</th>
+                        <td>{{ report.seoH1Count ?? '-' }} balise(s)</td>
+                    </tr>
+                    <tr>
+                        <th>Canonical</th>
+                        <td>{{ report.seoCanonical ?: '<em class="text-muted">non défini</em>'|raw }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# RGAA #}
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header"><h5 class="mb-0"><i class="fa-solid fa-universal-access"></i> RGAA / pa11y</h5></div>
+            <div class="card-body">
+                {% if report.rgaaErrors is not empty %}
+                    <h6 class="text-danger">Erreurs ({{ report.rgaaErrors|length }})</h6>
+                    <ul class="list-unstyled mb-3" style="max-height:200px; overflow-y:auto;">
+                        {% for error in report.rgaaErrors %}
+                            <li class="mb-1">
+                                <small class="text-danger fw-bold">{{ error.code ?? '' }}</small>
+                                <small>{{ error.message ?? error }}</small>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+
+                {% if report.rgaaWarnings is not empty %}
+                    <h6 class="text-warning">Avertissements ({{ report.rgaaWarnings|length }})</h6>
+                    <ul class="list-unstyled mb-0" style="max-height:200px; overflow-y:auto;">
+                        {% for warn in report.rgaaWarnings %}
+                            <li class="mb-1">
+                                <small class="text-warning fw-bold">{{ warn.code ?? '' }}</small>
+                                <small>{{ warn.message ?? warn }}</small>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+
+                {% if report.rgaaErrors is empty and report.rgaaWarnings is empty %}
+                    <p class="text-muted mb-0">Aucune erreur ni avertissement détecté.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {# Crawl metadata #}
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header"><h5 class="mb-0"><i class="fa-solid fa-spider"></i> Crawl</h5></div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <th style="width:140px;">Profondeur</th>
+                        <td>{{ report.crawlMetadata.depth ?? '-' }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# Lighthouse raw #}
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fa-solid fa-bolt"></i> Rapport Lighthouse brut
+                    {% if report.lighthouseReport is not empty %}
+                        <small class="text-muted">({{ report.lighthouseReport|length }} propriétés)</small>
+                    {% endif %}
+                </h5>
+            </div>
+                    <div class="card-body">
+                        {% if report.lighthouseReport is not empty %}
+                            <pre class="mb-0" style="max-height:400px; overflow:auto; font-size:0.8em; white-space:pre; word-wrap:normal;"><code>{{ report.lighthouseReport|json_pretty|e }}</code></pre>
+                        {% else %}
+                            <p class="text-muted mb-0">Aucun rapport Lighthouse disponible.</p>
+                        {% endif %}
+                    </div>
+        </div>
+    </div>
+
+    {# pa11y raw #}
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fa-solid fa-universal-access"></i> Rapport pa11y brut
+                    {% if report.pa11yReport is not empty %}
+                        <small class="text-muted">({{ report.pa11yReport|length }} entrées)</small>
+                    {% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if report.pa11yReport is not empty %}
+                    <pre class="mb-0" style="max-height:400px; overflow:auto; font-size:0.8em; white-space:pre; word-wrap:normal;"><code>{{ report.pa11yReport|json_pretty|e }}</code></pre>
+                {% else %}
+                    <p class="text-muted mb-0">Aucun rapport pa11y disponible.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

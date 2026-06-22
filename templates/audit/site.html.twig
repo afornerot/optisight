@@ -1,0 +1,151 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ site.name }} - Audit{% endblock %}
+
+{% block body %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ path('audit_index') }}">Audit</a></li>
+        <li class="breadcrumb-item active">{{ site.name }}</li>
+    </ol>
+</nav>
+
+{% for message in app.flashes('success') %}
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+{% endfor %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-0">{{ site.name }}</h1>
+        <code class="text-muted">{{ site.rootUrl }}</code>
+    </div>
+    <div>
+        <form method="post" action="{{ path('audit_delete', {id: site.id}) }}" class="d-inline" onsubmit="return confirm('Supprimer ce site et toutes ses analyses ?')">
+            <button type="submit" class="btn btn-outline-danger btn-sm">
+                <i class="fa-solid fa-trash"></i> Supprimer
+            </button>
+        </form>
+    </div>
+</div>
+
+{# Crawl section #}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fa-solid fa-spider"></i> Crawl</h5>
+        {% if site.lastCrawledAt %}
+            <span class="text-muted small">Dernier crawl : {{ site.lastCrawledAt|date('d/m/Y H:i') }} — {{ site.crawledPages }} pages</span>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        {% if site.crawlStatus == 'running' %}
+            <div class="d-flex align-items-center text-warning">
+                <span class="spinner-border spinner-border-sm me-2"></span>
+                Crawl en cours...
+            </div>
+        {% elseif site.crawlStatus == 'completed' %}
+            <p class="mb-2">{{ site.crawledPages }} pages découvertes le {{ site.lastCrawledAt|date('d/m/Y à H:i') }}.</p>
+            <a href="{{ path('audit_crawl_page', {id: site.id}) }}" class="btn btn-outline-primary btn-sm">
+                <i class="fa-solid fa-rotate"></i> Actualiser le crawl
+            </a>
+        {% else %}
+            <p class="text-muted mb-2">Aucun crawl effectué. Lancez un crawl pour découvrir les pages du site avant de lancer une analyse.</p>
+            <a href="{{ path('audit_crawl_page', {id: site.id}) }}" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-spider"></i> Lancer le crawl
+            </a>
+        {% endif %}
+    </div>
+</div>
+
+{# Analyze section #}
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fa-solid fa-chart-line"></i> Analyse RGAA + IA</h5>
+    </div>
+    <div class="card-body">
+        {% if site.crawlStatus == 'completed' and site.crawledPages > 0 %}
+            <p class="text-muted mb-2">{{ site.crawledPages }} pages prêtes pour l'analyse.</p>
+            <form method="post" action="{{ path('audit_analyze', {id: site.id}) }}" class="d-inline">
+                <button type="submit" class="btn btn-success">
+                    <i class="fa-solid fa-play"></i> Lancer une analyse RGAA
+                </button>
+            </form>
+        {% else %}
+            <p class="text-muted mb-0">Vous devez d'abord crawler le site.</p>
+        {% endif %}
+    </div>
+</div>
+
+{# Analyses list #}
+{% if analyses is not empty %}
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Analyses</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Statut</th>
+                        <th>Pages</th>
+                        <th>Durée</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for analysis in analyses %}
+                        <tr>
+                            <td>{{ analysis.createdAt|date('d/m/Y H:i') }}</td>
+                            <td>
+                                {% set statusColors = {
+                                    'completed': 'success',
+                                    'running': 'warning',
+                                    'failed': 'danger',
+                                    'cancelled': 'secondary',
+                                    'pending': 'secondary'
+                                } %}
+                                {% set statusLabels = {
+                                    'completed': 'Terminée',
+                                    'running': 'En cours',
+                                    'failed': 'Échouée',
+                                    'cancelled': 'Arrêtée',
+                                    'pending': 'En attente'
+                                } %}
+                                <span class="badge bg-{{ statusColors[analysis.status] ?? 'secondary' }}">
+                                    {{ statusLabels[analysis.status] ?? analysis.status }}
+                                </span>
+                                {% if analysis.errorMessage %}
+                                    <small class="text-danger d-block">{{ analysis.errorMessage }}</small>
+                                {% endif %}
+                            </td>
+                            <td>{{ analysis.pagesCrawled }}/{{ analysis.totalPages }}</td>
+                            <td>{{ analysis.duration ?? '-' }}</td>
+                            <td class="text-end">
+                                {% if analysis.status == 'running' %}
+                                    <a href="{{ path('audit_analysis_progress', {id: analysis.id}) }}" class="btn btn-sm btn-outline-warning">
+                                        <i class="fa-solid fa-spinner fa-spin"></i> Suivre
+                                    </a>
+                                {% else %}
+                                    <a href="{{ path('audit_analysis', {id: analysis.id}) }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fa-solid fa-eye"></i> Voir
+                                    </a>
+                                {% endif %}
+                                {% if analysis.status != 'running' %}
+                                    <form method="post" action="{{ path('audit_analysis_delete', {id: analysis.id}) }}" class="d-inline" onsubmit="return confirm('Supprimer cette analyse et tous ses rapports ?')">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

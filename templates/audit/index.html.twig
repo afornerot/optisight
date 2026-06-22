@@ -1,0 +1,77 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Audit RGAA & SEO - {{ parent() }}{% endblock %}
+
+{% block body %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">Sites audités</h1>
+    <a href="{{ path('audit_new') }}" class="btn btn-primary">
+        <i class="fa-solid fa-plus"></i> Ajouter un site
+    </a>
+</div>
+
+{% for message in app.flashes('success') %}
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+{% endfor %}
+
+{% if sites is empty %}
+    <div class="card">
+        <div class="card-body text-center text-muted py-5">
+            <i class="fa-solid fa-globe fa-3x mb-3"></i>
+            <p>Aucun site configuré. Ajoutez votre premier site pour commencer.</p>
+        </div>
+    </div>
+{% else %}
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th>URL</th>
+                        <th>Analyses</th>
+                        <th>Dernière analyse</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for site in sites %}
+                        <tr>
+                            <td>
+                                <a href="{{ path('audit_site', {id: site.id}) }}" class="text-decoration-none fw-bold">
+                                    {{ site.name }}
+                                </a>
+                            </td>
+                            <td><code>{{ site.rootUrl }}</code></td>
+                            <td>{{ site.analyses|length }}</td>
+                            <td>
+                                {% if site.analyses|length > 0 %}
+                                    {% set last = site.analyses|first %}
+                                    <span class="badge bg-{{ last.status == 'completed' ? 'success' : last.status == 'running' ? 'warning' : last.status == 'failed' ? 'danger' : 'secondary' }}">
+                                        {{ last.createdAt|date('d/m/Y H:i') }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <a href="{{ path('audit_site', {id: site.id}) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fa-solid fa-eye"></i>
+                                </a>
+                                <form method="post" action="{{ path('audit_delete', {id: site.id}) }}" class="d-inline" onsubmit="return confirm('Supprimer ce site et toutes ses analyses ?')">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends 'base.html.twig' %}
+
+{% block title %} = {{title}}{% endblock %}
+
+{% block body %}
+    <h1>{{title}}</h1>
+    <a href="{{ path(routesubmit) }}" class="btn btn-success">Ajouter</a>
+
+            <div class="dataTable_wrapper">
+                <table class="table table-striped table-bordered table-hover" id="dataTables" style="width:100%">
+                    <thead>
+                    <tr>
+                        <th width="70px" class="no-sort">Action</th>
+                        <th width="70px" class="no-sort">Avatar</th>
+                        <th>Login</th>
+                        <th>Rôles</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                            <tr>
+                                <td><a href="{{ path(routeupdate,{id:user.id}) }}"><i class="fas fa-file fa-2x"></i></a></td>
+                                <td><img class="avatar" src="{{ asset(user.avatar)}}"></td>
+                                <td>{{user.username}}</td>
+                                <td>
+                                    {% for role in user.roles %}
+                                        {{role}}<br>
+                                    {% endfor %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+{% endblock %}
+
+{% block localscript %}
+    <script>
+        $(document).ready(function() {
+            $('#dataTables').DataTable({
+                columnDefs: [ { "targets": "no-sort", "orderable": false }, { "targets": "no-string", "type" : "num" } ],
+                responsive: true,
+                iDisplayLength: 100,
+                order: [[ 2, "asc" ]]
+            });
+        });
+    </script>
+{% endblock %}

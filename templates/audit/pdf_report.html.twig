@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Rapport d'analyse - {{ site.name }} - {{ analysis.getCreatedAt()|date('d/m/Y') }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: DejaVu Sans, sans-serif; font-size: 10pt; color: #222; line-height: 1.5; }
+        .container { padding: 20px; }
+        h1 { font-size: 18pt; margin-bottom: 5px; color: #1a1a2e; }
+        h2 { font-size: 14pt; margin: 20px 0 10px; color: #1a1a2e; border-bottom: 2px solid #ddd; padding-bottom: 5px; }
+        h3 { font-size: 11pt; margin: 12px 0 6px; color: #333; }
+        .meta { color: #666; font-size: 9pt; margin-bottom: 15px; }
+        .scores { margin: 15px 0; }
+        .scores table { width: 100%; border-collapse: collapse; }
+        .scores td, .scores th { padding: 8px 12px; text-align: center; border: 1px solid #ddd; }
+        .scores th { background: #f5f5f5; font-weight: bold; }
+        .score-val { font-size: 16pt; font-weight: bold; }
+        .score-green { color: #198754; }
+        .score-orange { color: #fd7e14; }
+        .score-red { color: #dc3545; }
+        .summary { background: #f8f9fa; padding: 12px; border-radius: 4px; margin: 10px 0; }
+        .rec { margin: 10px 0; padding: 10px; border-left: 4px solid #ccc; background: #fafafa; }
+        .rec-HIGH { border-color: #dc3545; }
+        .rec-MEDIUM { border-color: #fd7e14; }
+        .rec-LOW { border-color: #0d6efd; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 8pt; font-weight: bold; color: #fff; margin-right: 4px; }
+        .badge-HIGH { background: #dc3545; }
+        .badge-MEDIUM { background: #fd7e14; }
+        .badge-LOW { background: #0d6efd; }
+        .badge-cat { background: #6c757d; }
+        .pages { font-size: 8pt; color: #666; margin: 4px 0; }
+        .pages code { background: #eee; padding: 1px 4px; border-radius: 2px; }
+        .details { font-size: 9pt; white-space: pre-wrap; margin-top: 6px; }
+        table.data { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 9pt; }
+        table.data th { background: #f5f5f5; padding: 6px 8px; border: 1px solid #ddd; text-align: left; }
+        table.data td { padding: 6px 8px; border: 1px solid #ddd; }
+        table.data tr:nth-child(even) { background: #fafafa; }
+        .footer { margin-top: 30px; padding-top: 10px; border-top: 1px solid #ddd; font-size: 8pt; color: #999; text-align: center; }
+        .page-break { page-break-before: always; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <h1>Rapport d'audit web</h1>
+    <div class="meta">
+        Site : <strong>{{ site.name }}</strong> ({{ site.rootUrl }})<br>
+        Date de l'analyse : {{ analysis.getCreatedAt()|date('d/m/Y à H:i') }}<br>
+        Pages analysées : {{ reports|length }}
+        {% if analysis.getDuration() %} — Durée : {{ analysis.getDuration() }}{% endif %}
+    </div>
+
+    {% if reports is not empty %}
+        {% set avgPerf = 0 %}
+        {% set avgA11y = 0 %}
+        {% set avgSeo = 0 %}
+        {% set avgRgaa = 0 %}
+        {% set count = reports|length %}
+        {% for r in reports %}
+            {% set avgPerf = avgPerf + (r.lhPerformance ?? 0) %}
+            {% set avgA11y = avgA11y + (r.lhAccessibility ?? 0) %}
+            {% set avgSeo = avgSeo + (r.lhSeo ?? 0) %}
+            {% set avgRgaa = avgRgaa + (r.rgaaScore ?? 0) %}
+        {% endfor %}
+        {% set avgPerf = count > 0 ? (avgPerf / count)|round : 0 %}
+        {% set avgA11y = count > 0 ? (avgA11y / count)|round : 0 %}
+        {% set avgSeo = count > 0 ? (avgSeo / count)|round : 0 %}
+        {% set avgRgaa = count > 0 ? (avgRgaa / count)|round : 0 %}
+
+        <h2>Scores moyens</h2>
+        <div class="scores">
+            <table>
+                <tr>
+                    <th>Performance</th>
+                    <th>Accessibilité</th>
+                    <th>SEO</th>
+                    <th>RGAA</th>
+                </tr>
+                <tr>
+                    <td><span class="score-val {{ avgPerf >= 90 ? 'score-green' : avgPerf >= 50 ? 'score-orange' : 'score-red' }}">{{ avgPerf }}/100</span></td>
+                    <td><span class="score-val {{ avgA11y >= 90 ? 'score-green' : avgA11y >= 50 ? 'score-orange' : 'score-red' }}">{{ avgA11y }}/100</span></td>
+                    <td><span class="score-val {{ avgSeo >= 90 ? 'score-green' : avgSeo >= 50 ? 'score-orange' : 'score-red' }}">{{ avgSeo }}/100</span></td>
+                    <td><span class="score-val {{ avgRgaa >= 90 ? 'score-green' : avgRgaa >= 50 ? 'score-orange' : 'score-red' }}">{{ avgRgaa }}/100</span></td>
+                </tr>
+            </table>
+        </div>
+    {% endif %}
+
+    {% if summary %}
+        <div class="page-break"></div>
+        <h2>Analyse IA</h2>
+        <div class="summary">{{ summary.summary }}</div>
+
+        {% if summary.recommendations is not empty %}
+            <h3>Recommandations</h3>
+            {% for rec in summary.recommendations %}
+                <div class="rec rec-{{ rec.priority ?? 'LOW' }}">
+                    <span class="badge badge-{{ rec.priority ?? 'LOW' }}">{{ rec.priority ?? 'LOW' }}</span>
+                    <span class="badge badge-cat">{{ rec.category ?? '' }}</span>
+                    <strong>{{ rec.title ?? '' }}</strong>
+                    {% if rec.pages is defined and rec.pages is not empty %}
+                        <div class="pages">
+                            Pages :
+                            {% for page in rec.pages %}
+                                <code>{{ page }}</code>{% if not loop.last %} {% endif %}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    {% if rec.details is defined and rec.details %}
+                        <div class="details">{{ rec.details }}</div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endif %}
+
+    {% if reports is not empty %}
+        <div class="page-break"></div>
+        <h2>Détails par page</h2>
+        <table class="data">
+            <thead>
+                <tr>
+                    <th>URL</th>
+                    <th style="text-align:center;">Perf</th>
+                    <th style="text-align:center;">Access.</th>
+                    <th style="text-align:center;">SEO</th>
+                    <th style="text-align:center;">RGAA</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for report in reports %}
+                    <tr>
+                        <td>{{ report.url }}</td>
+                        <td style="text-align:center;">
+                            {% if report.lhPerformance is not null %}
+                                <span class="{{ report.lhPerformance >= 90 ? 'score-green' : report.lhPerformance >= 50 ? 'score-orange' : 'score-red' }}">{{ report.lhPerformance|round }}</span>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td style="text-align:center;">
+                            {% if report.lhAccessibility is not null %}
+                                <span class="{{ report.lhAccessibility >= 90 ? 'score-green' : report.lhAccessibility >= 50 ? 'score-orange' : 'score-red' }}">{{ report.lhAccessibility|round }}</span>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td style="text-align:center;">
+                            {% if report.lhSeo is not null %}
+                                <span class="{{ report.lhSeo >= 90 ? 'score-green' : report.lhSeo >= 50 ? 'score-orange' : 'score-red' }}">{{ report.lhSeo|round }}</span>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td style="text-align:center;">
+                            {% if report.rgaaScore is not null %}
+                                <span class="{{ report.rgaaScore >= 90 ? 'score-green' : report.rgaaScore >= 50 ? 'score-orange' : 'score-red' }}">{{ report.rgaaScore|round }}</span>
+                            {% else %}-{% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
+    <div class="footer">
+        Rapport généré le {{ "now"|date('d/m/Y à H:i') }} — iargaaseo
+    </div>
+</div>
+</body>
+</html>

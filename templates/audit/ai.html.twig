@@ -1,0 +1,170 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Synthèse IA - {{ site.name }}{% endblock %}
+
+{% block body %}
+<div style="height: calc(100vh - 56px); margin: -1rem; display: flex; flex-direction: column;">
+    <div class="px-4 pt-3 pb-2">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-2">
+                <li class="breadcrumb-item"><a href="{{ path('audit_index') }}">Audit</a></li>
+                <li class="breadcrumb-item"><a href="{{ path('audit_site', {id: site.id}) }}">{{ site.name }}</a></li>
+                <li class="breadcrumb-item active">Synthèse IA</li>
+            </ol>
+        </nav>
+    </div>
+
+    <div class="px-4 pb-4 flex-grow-1 d-flex flex-column" style="min-height: 0;">
+        <div class="card d-flex flex-column" style="height: 100%; min-height: 0;">
+            <div class="card-header d-flex justify-content-between align-items-center py-2">
+                <h6 class="mb-0"><i class="fa-solid fa-terminal"></i> Console — Synthèse IA</h6>
+                <div>
+                    <span id="status-badge" class="badge bg-warning">En cours...</span>
+                </div>
+            </div>
+            <div class="card-body p-0 d-flex flex-column" style="min-height: 0;">
+                <div id="console-output" class="p-3 text-white bg-dark m-0" style="flex: 1 1 0; overflow-y: auto; font-family: monospace; white-space: pre-wrap; font-size: 0.85em;">Connexion au flux...</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block localscript %}
+<script>
+(function() {
+    const consoleEl = document.getElementById('console-output');
+    const statusBadge = document.getElementById('status-badge');
+    let buffer = '';
+
+    function esc(str) {
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    function parseLine(line) {
+        if (line.startsWith('TITLE:')) {
+            return '<h5 class="text-info mt-2 mb-1">' + esc(line.substring(6)) + '</h5>';
+        }
+        if (line.startsWith('STEP:')) {
+            return '<div class="text-warning mt-2"><span class="spinner-border spinner-border-sm"></span> ' + esc(line.substring(5)) + '</div>';
+        }
+        if (line.startsWith('PAGES:')) {
+            return '<div class="text-muted mb-2">' + esc(line.substring(6)) + ' page(s) analysées</div>';
+        }
+        if (line.startsWith('PAGE_DATA:')) {
+            return '<div class="ms-2 text-muted"><i class="fa-solid fa-file-lines"></i> ' + esc(line.substring(10)) + '</div>';
+        }
+        if (line.startsWith('SUMMARY:')) {
+            return '<div class="mt-3 p-3 border border-secondary rounded"><strong class="text-info"><i class="fa-solid fa-robot"></i> Résumé IA</strong><p class="mb-0 mt-2 text-light">' + esc(line.substring(8)) + '</p></div>';
+        }
+        if (line.startsWith('REC:')) {
+            const parts = line.substring(4).split('|');
+            const priority = parts[0];
+            const category = parts[1];
+            const title = parts[2];
+            const details = parts[3] || '';
+            const pages = parts[4] || '';
+            const badgeColors = { 'HIGH': 'danger', 'MEDIUM': 'warning', 'LOW': 'info' };
+            const badgeColor = badgeColors[priority] || 'secondary';
+            let html = '<div class="ms-3 mt-2 p-2 border-start border-4 border-' + badgeColor + ' bg-dark text-light rounded">';
+            html += '<span class="badge bg-' + badgeColor + ' me-1">' + esc(priority) + '</span>';
+            html += '<span class="badge bg-secondary me-1">' + esc(category) + '</span>';
+            html += '<strong class="text-light">' + esc(title) + '</strong>';
+            if (pages) {
+                html += '<div class="mt-1"><small class="text-muted">Pages concernées :</small><div class="ms-2">';
+                pages.split(',').forEach(function(p) {
+                    html += '<code class="text-warning small">' + esc(p.trim()) + '</code> ';
+                });
+                html += '</div></div>';
+            }
+            if (details) {
+                html += '<div class="text-light small mt-1" style="white-space:pre-wrap;">' + esc(details) + '</div>';
+            }
+            html += '</div>';
+            return html;
+        }
+        if (line.startsWith('DONE:')) {
+            return '<div class="text-success fw-bold mt-2"><i class="fa-solid fa-check-circle"></i> ' + esc(line.substring(5)) + '</div>';
+        }
+        if (line.startsWith('WARN:')) {
+            return '<div class="text-warning mt-2"><i class="fa-solid fa-triangle-exclamation"></i> ' + esc(line.substring(5)) + '</div>';
+        }
+        if (line.startsWith('ERROR:')) {
+            return '<div class="text-danger fw-bold mt-2"><i class="fa-solid fa-xmark-circle"></i> ' + esc(line.substring(6)) + '</div>';
+        }
+        if (line.startsWith('INFO:')) {
+            return '<div class="text-info">' + esc(line.substring(5)) + '</div>';
+        }
+        return '<div>' + esc(line) + '</div>';
+    }
+
+    function renderBuffer() {
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        let html = '';
+        for (const line of lines) {
+            if (line.trim()) html += parseLine(line);
+        }
+        consoleEl.innerHTML += html;
+        consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+
+    function setStatus(label, color) {
+        statusBadge.textContent = label;
+        statusBadge.className = 'badge bg-' + color;
+    }
+
+    function showEndButtons() {
+        let html = '<div class="mt-3 pt-3 border-top border-secondary">';
+        html += '<a href="{{ path("audit_analysis", {id: analysis.id}) }}" class="btn btn-primary btn-lg me-2"><i class="fa-solid fa-chart-line"></i> Voir les résultats</a>';
+        html += '<button type="button" onclick="window.location.reload()" class="btn btn-outline-success btn-lg me-2"><i class="fa-solid fa-rotate"></i> Relancer l\'IA</button>';
+        html += '<a href="{{ path("audit_site", {id: site.id}) }}" class="btn btn-outline-secondary btn-lg"><i class="fa-solid fa-arrow-left"></i> Retour au site</a>';
+        html += '</div>';
+        consoleEl.innerHTML += html;
+        consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+
+    (async function() {
+        try {
+            setStatus('Synthèse IA en cours...', 'warning');
+            const response = await fetch('{{ path("audit_stream_ai", {id: analysis.id}) }}');
+
+            if (!response.ok) {
+                consoleEl.innerHTML += '<div class="text-danger">Erreur HTTP ' + response.status + '</div>';
+                setStatus('Erreur', 'danger');
+                return;
+            }
+
+            if (!response.body) {
+                consoleEl.innerHTML += '<div class="text-danger">Streaming non supporté.</div>';
+                return;
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                renderBuffer();
+            }
+
+            if (buffer.trim()) {
+                consoleEl.innerHTML += parseLine(buffer);
+                buffer = '';
+            }
+
+            setStatus('Terminé', 'success');
+            showEndButtons();
+
+        } catch (error) {
+            consoleEl.innerHTML += '<div class="text-danger fw-bold">Erreur : ' + esc(error.message) + '</div>';
+            setStatus('Erreur', 'danger');
+        }
+    })();
+})();
+</script>
+{% endblock %}

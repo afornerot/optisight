@@ -1,0 +1,40 @@
+services:
+  mariadb:
+    image: mariadb
+    container_name: iargaaseo-mariadb
+    restart: unless-stopped  
+    environment:
+      MYSQL_ROOT_PASSWORD: changeme
+      MYSQL_DATABASE: iargaaseo
+      MYSQL_USER: user
+      MYSQL_PASSWORD: changeme
+    volumes:
+      - ./volume/mariadb:/var/lib/mysql
+
+  iargaaseo:
+    build:
+      context: .
+      dockerfile: ./misc/docker/Dockerfile
+    container_name: iargaaseo
+    restart: unless-stopped  
+    image: reg.cadoles.com/envole/iargaaseo
+    depends_on: 
+      - mariadb
+    ports:
+      - "8025:80"
+    volumes:
+      - ./public/uploads:/app/public/uploads:delegated
+      - ./uploads:/app/uploads:delegated
+      - ./templates:/app/templates:delegated
+      - ./config:/app/config:delegated
+      - ./src:/app/src:delegated
+      - ./misc:/app/misc:delegated
+      - ./public/lib:/app/public/lib:delegated
+      - ./.env.local:/app/.env.local
+
+  adminer:
+    image: adminer
+    container_name: iargaaseo-adminer
+    restart: always
+    ports:
+      - 6025:8080

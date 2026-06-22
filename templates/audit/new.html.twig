@@ -1,0 +1,43 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Nouveau site - Audit{% endblock %}
+
+{% block body %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ path('audit_index') }}">Audit</a></li>
+        <li class="breadcrumb-item active">Nouveau site</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Ajouter un site</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Nom du site</label>
+                        <input type="text" class="form-control" id="name" name="name" required
+                               placeholder="Mon site web">
+                    </div>
+                    <div class="mb-3">
+                        <label for="root_url" class="form-label">URL racine</label>
+                        <input type="url" class="form-control" id="root_url" name="root_url" required
+                               placeholder="https://example.com">
+                        <div class="form-text">L'analyse commencera à cette URL et explorera toutes les pages liées.</div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fa-solid fa-plus"></i> Ajouter
+                        </button>
+                        <a href="{{ path('audit_index') }}" class="btn btn-outline-secondary">Annuler</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

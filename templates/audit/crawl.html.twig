@@ -1,0 +1,174 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Crawl - {{ site.name }}{% endblock %}
+
+{% block body %}
+<div style="height: calc(100vh - 56px); margin: -1rem; display: flex; flex-direction: column;">
+    <div class="px-4 pt-3 pb-2">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-2">
+                <li class="breadcrumb-item"><a href="{{ path('audit_index') }}">Audit</a></li>
+                <li class="breadcrumb-item"><a href="{{ path('audit_site', {id: site.id}) }}">{{ site.name }}</a></li>
+                <li class="breadcrumb-item active">Crawl</li>
+            </ol>
+        </nav>
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center py-2">
+                <h5 class="mb-0"><i class="fa-solid fa-spider"></i> Crawl de {{ site.name }}</h5>
+                <span class="text-muted">{{ site.rootUrl }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="px-4 pb-4 flex-grow-1 d-flex flex-column" style="min-height: 0;">
+        <div class="card d-flex flex-column" style="height: 100%; min-height: 0;">
+            <div class="card-header d-flex justify-content-between align-items-center py-2">
+                <h6 class="mb-0"><i class="fa-solid fa-terminal"></i> Console</h6>
+                <div>
+                    <button class="btn btn-outline-danger btn-sm" id="btn-stop" onclick="stopCrawl()" style="display: none;">
+                        <i class="fa-solid fa-stop"></i> Arrêter
+                    </button>
+                    <span id="status-badge" class="badge bg-warning">En cours...</span>
+                </div>
+            </div>
+            <div class="card-body p-0 d-flex flex-column" style="min-height: 0;">
+                <div id="console-output" class="p-3 text-white bg-dark m-0" style="flex: 1 1 0; overflow-y: auto; font-family: monospace; white-space: pre-wrap; font-size: 0.85em;">Connexion au flux...</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block localscript %}
+<script>
+(async function() {
+    const consoleEl = document.getElementById('console-output');
+    const statusBadge = document.getElementById('status-badge');
+    const btnStop = document.getElementById('btn-stop');
+
+    window.stopCrawl = async function() {
+        btnStop.disabled = true;
+        btnStop.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Arrêt...';
+        try {
+            await fetch('{{ path("audit_stream_stop", {type: "crawl", id: site.id}) }}', { method: 'POST' });
+        } catch (e) {}
+        consoleEl.innerHTML += '<div class="text-warning fw-bold mt-2"><i class="fa-solid fa-stop"></i> Arrêt demandé</div>';
+    };
+
+    let buffer = '';
+
+    function parseLine(line) {
+        if (line.startsWith('TITLE:')) {
+            return '<h5 class="text-info mt-2 mb-1">' + esc(line.substring(6)) + '</h5>';
+        }
+        if (line.startsWith('SITE:')) {
+            return '<div class="text-muted mb-1"><i class="fa-solid fa-globe"></i> ' + esc(line.substring(5)) + '</div>';
+        }
+        if (line.startsWith('URL:')) {
+            return '<code class="text-secondary mb-2 d-block">' + esc(line.substring(4)) + '</code>';
+        }
+        if (line.startsWith('STEP:')) {
+            return '<div class="text-warning mt-2"><span class="spinner-border spinner-border-sm"></span> ' + esc(line.substring(5)) + '</div>';
+        }
+        if (line.startsWith('DONE:')) {
+            return '<div class="text-success fw-bold mt-2"><i class="fa-solid fa-check-circle"></i> ' + esc(line.substring(5)) + '</div>';
+        }
+        if (line.startsWith('WARN:')) {
+            return '<div class="text-warning mt-2"><i class="fa-solid fa-triangle-exclamation"></i> ' + esc(line.substring(5)) + '</div>';
+        }
+        if (line.startsWith('ERROR:')) {
+            return '<div class="text-danger fw-bold mt-2"><i class="fa-solid fa-xmark-circle"></i> ' + esc(line.substring(6)) + '</div>';
+        }
+        if (line.startsWith('INFO:')) {
+            return '<div class="text-info">' + esc(line.substring(5)) + '</div>';
+        }
+        if (line.startsWith('FOUND:')) {
+            const parts = line.substring(6).split(':');
+            const status = parts[0];
+            const url = parts.slice(1, -1).join(':');
+            const title = parts[parts.length - 1] || '';
+            const statusClass = status === '200' ? 'text-success' : status.startsWith('3') ? 'text-warning' : 'text-danger';
+            let html = '<div class="d-flex align-items-start ms-2">';
+            html += '<span class="' + statusClass + ' fw-bold me-2" style="min-width:32px;">[' + esc(status) + ']</span>';
+            html += '<span class="text-light">' + esc(url) + '</span>';
+            if (title) html += '<span class="text-muted ms-2">— ' + esc(title) + '</span>';
+            html += '</div>';
+            return html;
+        }
+        if (line.startsWith('SKIP:')) {
+            const parts = line.substring(5).split(':');
+            const url = parts[0];
+            const reason = parts[1] || '';
+            let label = '';
+            if (reason === 'not_html') label = 'pas HTML';
+            else if (reason === 'http_error') label = 'erreur HTTP';
+            else if (reason === 'error') label = 'échec';
+            return '<div class="d-flex align-items-start ms-2 text-muted"><span class="me-2" style="min-width:32px;">[--]</span><span class="text-decoration-line-through">' + esc(url) + '</span><span class="ms-2 fst-italic">' + esc(label) + '</span></div>';
+        }
+        return '<div>' + esc(line) + '</div>';
+    }
+
+    function esc(str) {
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    function renderBuffer() {
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        let html = '';
+        for (const line of lines) {
+            if (line.trim()) html += parseLine(line);
+        }
+        consoleEl.innerHTML += html;
+        consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+
+    function setStatus(label, color) {
+        statusBadge.textContent = label;
+        statusBadge.className = 'badge bg-' + color;
+    }
+
+    try {
+        btnStop.style.display = 'inline-block';
+        const response = await fetch('{{ path("audit_stream_crawl", {id: site.id}) }}');
+
+        if (!response.ok) {
+            consoleEl.innerHTML += '<div class="text-danger">Erreur HTTP ' + response.status + '</div>';
+            setStatus('Erreur', 'danger');
+            return;
+        }
+
+        if (!response.body) {
+            consoleEl.innerHTML += '<div class="text-danger">Streaming non supporté.</div>';
+            return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            renderBuffer();
+        }
+
+        if (buffer.trim()) {
+            consoleEl.innerHTML += parseLine(buffer);
+        }
+
+        setStatus('Terminé', 'success');
+        btnStop.style.display = 'none';
+
+        consoleEl.innerHTML += '<div class="mt-3 pt-3 border-top border-secondary"><a href="{{ path("audit_site", {id: site.id}) }}" class="btn btn-primary btn-lg"><i class="fa-solid fa-arrow-left"></i> Retour au site</a></div>';
+        consoleEl.scrollTop = consoleEl.scrollHeight;
+
+    } catch (error) {
+        consoleEl.innerHTML += '<div class="text-danger fw-bold">Erreur : ' + esc(error.message) + '</div>';
+        setStatus('Erreur', 'danger');
+    }
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,200 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Analyse {{ analysis.createdAt|date('d/m/Y') }} - {{ site.name }}{% endblock %}
+
+{% block body %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ path('audit_index') }}">Audit</a></li>
+        <li class="breadcrumb-item"><a href="{{ path('audit_site', {id: site.id}) }}">{{ site.name }}</a></li>
+        <li class="breadcrumb-item active">Analyse {{ analysis.createdAt|date('d/m/Y H:i') }}</li>
+    </ol>
+</nav>
+
+{% for message in app.flashes('success') %}
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+{% endfor %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-0">Analyse du {{ analysis.createdAt|date('d/m/Y à H:i') }}</h1>
+        <span class="text-muted">{{ analysis.pagesCrawled }} pages analysées
+            {% if analysis.duration %} en {{ analysis.duration }}{% endif %}
+        </span>
+        {% set statusColors = { 'completed': 'success', 'running': 'warning', 'failed': 'danger', 'cancelled': 'secondary', 'pending': 'secondary' } %}
+        <span class="badge bg-{{ statusColors[analysis.status] ?? 'secondary' }} ms-2">{{ analysis.status }}</span>
+    </div>
+    <div>
+        <a href="{{ path('audit_analysis_pdf', {id: analysis.id}) }}" class="btn btn-outline-primary btn-sm me-2" target="_blank">
+            <i class="fa-solid fa-file-pdf"></i> Rapport PDF
+        </a>
+        <form method="post" action="{{ path('audit_analysis_delete', {id: analysis.id}) }}" class="d-inline" onsubmit="return confirm('Supprimer cette analyse et tous ses rapports ?')">
+            <button type="submit" class="btn btn-outline-danger btn-sm">
+                <i class="fa-solid fa-trash"></i> Supprimer
+            </button>
+        </form>
+    </div>
+</div>
+
+{% if reports is not empty %}
+    {% set avgPerf = 0 %}
+    {% set avgA11y = 0 %}
+    {% set avgSeo = 0 %}
+    {% set avgRgaa = 0 %}
+    {% set count = reports|length %}
+    {% for r in reports %}
+        {% set avgPerf = avgPerf + (r.lhPerformance ?? 0) %}
+        {% set avgA11y = avgA11y + (r.lhAccessibility ?? 0) %}
+        {% set avgSeo = avgSeo + (r.lhSeo ?? 0) %}
+        {% set avgRgaa = avgRgaa + (r.rgaaScore ?? 0) %}
+    {% endfor %}
+    {% set avgPerf = count > 0 ? (avgPerf / count)|round : 0 %}
+    {% set avgA11y = count > 0 ? (avgA11y / count)|round : 0 %}
+    {% set avgSeo = count > 0 ? (avgSeo / count)|round : 0 %}
+    {% set avgRgaa = count > 0 ? (avgRgaa / count)|round : 0 %}
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <div class="display-6 fw-bold {{ avgPerf >= 90 ? 'text-success' : avgPerf >= 50 ? 'text-warning' : 'text-danger' }}">{{ avgPerf }}</div>
+                    <div class="text-muted">Performance</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <div class="display-6 fw-bold {{ avgA11y >= 90 ? 'text-success' : avgA11y >= 50 ? 'text-warning' : 'text-danger' }}">{{ avgA11y }}</div>
+                    <div class="text-muted">Accessibilité</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <div class="display-6 fw-bold {{ avgSeo >= 90 ? 'text-success' : avgSeo >= 50 ? 'text-warning' : 'text-danger' }}">{{ avgSeo }}</div>
+                    <div class="text-muted">SEO</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <div class="display-6 fw-bold {{ avgRgaa >= 90 ? 'text-success' : avgRgaa >= 50 ? 'text-warning' : 'text-danger' }}">{{ avgRgaa }}</div>
+                    <div class="text-muted">RGAA</div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+{% if summary %}
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0"><i class="fa-solid fa-robot"></i> Résumé IA</h5>
+            <a href="{{ path('audit_analysis_ai', {id: analysis.id}) }}" class="btn btn-outline-success btn-sm">
+                <i class="fa-solid fa-rotate"></i> Relancer l'IA
+            </a>
+        </div>
+        <div class="card-body">
+            <p style="white-space:pre-wrap;">{{ summary.summary }}</p>
+            {% if summary.recommendations is not empty %}
+                <h6 class="mt-3">Recommandations</h6>
+                {% for rec in summary.recommendations %}
+                    {% set borderColors = { 'HIGH': 'danger', 'MEDIUM': 'warning', 'LOW': 'primary' } %}
+                    <div class="border-start border-4 border-{{ borderColors[rec.priority] ?? 'secondary' }} p-3 mb-2 rounded">
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="badge bg-{{ borderColors[rec.priority] ?? 'secondary' }}">{{ rec.priority }}</span>
+                            <span class="badge bg-secondary">{{ rec.category }}</span>
+                            <strong class="text-light">{{ rec.title }}</strong>
+                        </div>
+                        {% if rec.pages is defined and rec.pages is not empty %}
+                            <div class="mb-1">
+                                <small class="text-muted">Pages concernées :</small>
+                                {% for page in rec.pages %}
+                                    <code class="text-warning small">{{ page }}</code>{% if not loop.last %} {% endif %}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <div class="text-light small" style="white-space:pre-wrap;">{{ rec.details }}</div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+{% else %}
+    <div class="card mb-4">
+        <div class="card-body text-center py-4">
+            <i class="fa-solid fa-robot fa-2x text-muted mb-3"></i>
+            <p class="text-muted mb-3">Aucune synthèse IA pour cette analyse.</p>
+            <a href="{{ path('audit_analysis_ai', {id: analysis.id}) }}" class="btn btn-success">
+                <i class="fa-solid fa-robot"></i> Lancer la synthèse IA
+            </a>
+        </div>
+    </div>
+{% endif %}
+
+{% if reports is not empty %}
+    <div class="card">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Détails par page</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>URL</th>
+                        <th class="text-center">Perf</th>
+                        <th class="text-center">Access.</th>
+                        <th class="text-center">SEO</th>
+                        <th class="text-center">RGAA</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for report in reports %}
+                        <tr>
+                            <td style="max-width:400px;">
+                                <a href="{{ path('audit_analysis_page', {id: analysis.id, reportId: report.id}) }}" class="text-decoration-none text-truncate d-inline-block" style="max-width:380px;" title="{{ report.url }}">
+                                    {{ report.url }}
+                                </a>
+                            </td>
+                            <td class="text-center">
+                                {% if report.lhPerformance is not null %}
+                                    <span class="{{ report.lhPerformance >= 90 ? 'text-success' : report.lhPerformance >= 50 ? 'text-warning' : 'text-danger' }} fw-bold">
+                                        {{ report.lhPerformance|round }}
+                                    </span>
+                                {% else %}-{% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if report.lhAccessibility is not null %}
+                                    <span class="{{ report.lhAccessibility >= 90 ? 'text-success' : report.lhAccessibility >= 50 ? 'text-warning' : 'text-danger' }} fw-bold">
+                                        {{ report.lhAccessibility|round }}
+                                    </span>
+                                {% else %}-{% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if report.lhSeo is not null %}
+                                    <span class="{{ report.lhSeo >= 90 ? 'text-success' : report.lhSeo >= 50 ? 'text-warning' : 'text-danger' }} fw-bold">
+                                        {{ report.lhSeo|round }}
+                                    </span>
+                                {% else %}-{% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if report.rgaaScore is not null %}
+                                    <span class="{{ report.rgaaScore >= 90 ? 'text-success' : report.rgaaScore >= 50 ? 'text-warning' : 'text-danger' }} fw-bold">
+                                        {{ report.rgaaScore|round }}
+                                    </span>
+                                {% else %}-{% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}
