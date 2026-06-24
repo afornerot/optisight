@@ -32,6 +32,9 @@ class Site
     #[Assert\Url]
     private ?string $rootUrl = null;
 
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $prodUrl = null;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private ?\DateTimeImmutable $createdAt = null;
 
@@ -109,6 +112,17 @@ class Site
     public function setRootUrl(string $rootUrl): static
     {
         $this->rootUrl = $rootUrl;
+        return $this;
+    }
+
+    public function getProdUrl(): ?string
+    {
+        return $this->prodUrl;
+    }
+
+    public function setProdUrl(?string $prodUrl): static
+    {
+        $this->prodUrl = $prodUrl;
         return $this;
     }
 

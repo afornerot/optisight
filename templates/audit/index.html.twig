@@ -37,8 +37,6 @@
                         <th class="text-center">Perf</th>
                         <th class="text-center">BP</th>
                         <th class="text-center">SEO</th>
-                        <th>Analyses</th>
-                        <th class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -49,30 +47,21 @@
                                     {{ site.name }}
                                 </a>
                             </td>
-                            <td><code>{{ site.rootUrl }}</code></td>
+                            <td><code>{{ site.rootUrl }}</code>{% if site.prodUrl %} <a href="{{ site.prodUrl }}" target="_blank" rel="noopener" class="text-decoration-none" title="PROD"><i class="fa-solid fa-up-right-from-square small"></i></a>{% endif %}</td>
                             {% set scores = siteScores[site.id] ?? null %}
-                            {% set labels = {'rgaa': 'RGAA', 'a11y': 'A11y', 'perf': 'Perf', 'bp': 'BP', 'seo': 'SEO'} %}
-                            {% set order = ['rgaa', 'a11y', 'perf', 'bp', 'seo'] %}
-                            {% for key in order %}
-                                <td class="text-center">
-                                    {% if scores and scores[key] is not null %}
-                                        <span class="fw-bold {{ scores[key] >= 90 ? 'text-success' : scores[key] >= 50 ? 'text-warning' : 'text-danger' }}">{{ scores[key] }}</span>
-                                    {% else %}
-                                        <span class="text-muted">-</span>
-                                    {% endif %}
-                                </td>
-                            {% endfor %}
-                            <td>{{ site.analyses|length }}</td>
-                            <td class="text-end">
-                                <a href="{{ path('audit_site', {id: site.id}) }}" class="btn btn-sm btn-outline-primary">
-                                    <i class="fa-solid fa-eye"></i>
-                                </a>
-                                <form method="post" action="{{ path('audit_delete', {id: site.id}) }}" class="d-inline" onsubmit="return confirm('Supprimer ce site et toutes ses analyses ?')">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">
-                                        <i class="fa-solid fa-trash"></i>
-                                    </button>
-                                </form>
-                            </td>
+                            {% macro scoreBadge(score) %}
+                                {% if score is not null %}
+                                    {% set color = score >= 90 ? 'success' : (score >= 50 ? 'warning' : 'danger') %}
+                                    <span class="badge bg-{{ color }}" style="font-size:0.95em; padding:0.4em 0.7em;">{{ score }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            {% endmacro %}
+                            <td class="text-center">{{ _self.scoreBadge(scores.rgaa ?? null) }}</td>
+                            <td class="text-center">{{ _self.scoreBadge(scores.a11y ?? null) }}</td>
+                            <td class="text-center">{{ _self.scoreBadge(scores.perf ?? null) }}</td>
+                            <td class="text-center">{{ _self.scoreBadge(scores.bp ?? null) }}</td>
+                            <td class="text-center">{{ _self.scoreBadge(scores.seo ?? null) }}</td>
                         </tr>
                     {% endfor %}
                 </tbody>

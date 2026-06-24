@@ -200,63 +200,33 @@
                     <tr>
                         <th>URL</th>
                         <th class="text-center">RGAA</th>
-                        <th class="text-center">Access.</th>
+                        <th class="text-center">A11y</th>
                         <th class="text-center">Perf</th>
                         <th class="text-center">BP</th>
                         <th class="text-center">SEO</th>
-                        <th class="text-center no-sort" style="width:50px;"></th>
                     </tr>
                 </thead>
                 <tbody>
+                    {% macro scoreBadge(score) %}
+                        {% if score is not null %}
+                            {% set color = score >= 90 ? 'success' : (score >= 50 ? 'warning' : 'danger') %}
+                            <span class="badge bg-{{ color }}" style="font-size:0.95em; padding:0.4em 0.7em;">{{ score|round }}</span>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    {% endmacro %}
                     {% for report in reports %}
                         <tr>
-                            <td style="max-width:400px;">
-                                <a href="{{ path('audit_analysis_page', {id: analysis.id, reportId: report.id}) }}" class="text-decoration-none text-truncate d-inline-block" style="max-width:380px;" title="{{ report.url }}">
+                            <td>
+                                <a href="{{ path('audit_analysis_page', {id: analysis.id, reportId: report.id}) }}" class="text-decoration-none text-truncate d-inline-block" style="max-width:600px;" title="{{ report.url }}">
                                     {{ report.url }}
                                 </a>
                             </td>
-                            <td class="text-center">
-                                {% if report.rgaaScore is not null %}
-                                    <span class="{{ report.rgaaScore >= 90 ? 'text-success' : report.rgaaScore >= 50 ? 'text-warning' : 'text-danger' }} fw-bold">
-                                        {{ report.rgaaScore|round }}
-                                    </span>
-                                {% else %}-{% endif %}
-                            </td>
-                            <td class="text-center">
-                                {% if report.lhAccessibility is not null %}
-                                    <span class="{{ report.lhAccessibility >= 90 ? 'text-success' : report.lhAccessibility >= 50 ? 'text-warning' : 'text-danger' }} fw-bold">
-                                        {{ report.lhAccessibility|round }}
-                                    </span>
-                                {% else %}-{% endif %}
-                            </td>
-                            <td class="text-center">
-                                {% if report.lhPerformance is not null %}
-                                    <span class="{{ report.lhPerformance >= 90 ? 'text-success' : report.lhPerformance >= 50 ? 'text-warning' : 'text-danger' }} fw-bold">
-                                        {{ report.lhPerformance|round }}
-                                    </span>
-                                {% else %}-{% endif %}
-                            </td>
-                            <td class="text-center">
-                                {% if report.lhBestPractices is not null %}
-                                    <span class="{{ report.lhBestPractices >= 90 ? 'text-success' : report.lhBestPractices >= 50 ? 'text-warning' : 'text-danger' }} fw-bold">
-                                        {{ report.lhBestPractices|round }}
-                                    </span>
-                                {% else %}-{% endif %}
-                            </td>
-                            <td class="text-center">
-                                {% if report.lhSeo is not null %}
-                                    <span class="{{ report.lhSeo >= 90 ? 'text-success' : report.lhSeo >= 50 ? 'text-warning' : 'text-danger' }} fw-bold">
-                                        {{ report.lhSeo|round }}
-                                    </span>
-                                {% else %}-{% endif %}
-                            </td>
-                            <td class="text-center">
-                                <form method="post" action="{{ path('audit_analysis_page_delete', {id: analysis.id, reportId: report.id}) }}" class="d-inline" onsubmit="return confirm('Supprimer cette page ?')">
-                                    <button type="submit" class="btn btn-link btn-sm text-danger p-0" title="Supprimer">
-                                        <i class="fa-solid fa-xmark"></i>
-                                    </button>
-                                </form>
-                            </td>
+                            <td class="text-center">{{ _self.scoreBadge(report.rgaaScore) }}</td>
+                            <td class="text-center">{{ _self.scoreBadge(report.lhAccessibility) }}</td>
+                            <td class="text-center">{{ _self.scoreBadge(report.lhPerformance) }}</td>
+                            <td class="text-center">{{ _self.scoreBadge(report.lhBestPractices) }}</td>
+                            <td class="text-center">{{ _self.scoreBadge(report.lhSeo) }}</td>
                         </tr>
                     {% endfor %}
                 </tbody>

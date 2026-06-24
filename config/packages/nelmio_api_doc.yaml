@@ -4,6 +4,15 @@ nelmio_api_doc:
             title: OptiSight API
             description: API de consultation des audits RGAA & SEO
             version: '1.0.0'
+        security:
+            - ApiKeyAuth: []
+        components:
+            securitySchemes:
+                ApiKeyAuth:
+                    type: apiKey
+                    in: header
+                    name: X-API-SECRET
+                    description: Secret API (APP_SECRET)
     areas:
         path_patterns:
             - ^/v1/api

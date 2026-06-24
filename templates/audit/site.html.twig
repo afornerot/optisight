@@ -27,6 +27,9 @@
     <div>
         <h1 class="h3 mb-0">{{ site.name }}</h1>
         <code class="text-muted">{{ site.rootUrl }}</code>
+        {% if site.prodUrl %}
+            <a href="{{ site.prodUrl }}" target="_blank" rel="noopener" class="ms-2 text-decoration-none"><code>{{ site.prodUrl }}</code> <i class="fa-solid fa-up-right-from-square small"></i></a>
+        {% endif %}
         {% if site.authType %}
             <span class="badge bg-warning text-dark ms-2"><i class="fa-solid fa-lock"></i> Protégé</span>
         {% endif %}
@@ -35,6 +38,9 @@
         {% endif %}
     </div>
     <div class="d-flex gap-2 align-items-center flex-wrap">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editSiteModal" title="Modifier les informations du site">
+            <i class="fa-solid fa-pen"></i> Modifier
+        </button>
         <a href="{{ path('audit_auth', {id: site.id}) }}" class="btn btn-outline-warning btn-sm" title="Authentification">
             <i class="fa-solid fa-key"></i> Auth
         </a>
@@ -66,6 +72,101 @@
         </form>
     </div>
 </div>
+
+{% if analyses is not empty %}
+    {% set latestScores = null %}
+    {% for analysis in analyses %}
+        {% if analysis.status == 'completed' and analysisScores[analysis.id] is defined and latestScores is null %}
+            {% set latestScores = analysisScores[analysis.id] %}
+        {% endif %}
+    {% endfor %}
+    {% if latestScores %}
+        <div class="row g-3 text-center mb-4">
+            <div class="col">
+                <div class="display-6 fw-bold {{ latestScores.rgaa >= 90 ? 'text-success' : latestScores.rgaa >= 50 ? 'text-warning' : 'text-danger' }}">{{ latestScores.rgaa }}</div>
+                <div class="text-muted small">RGAA</div>
+            </div>
+            <div class="col">
+                <div class="display-6 fw-bold {{ latestScores.a11y >= 90 ? 'text-success' : latestScores.a11y >= 50 ? 'text-warning' : 'text-danger' }}">{{ latestScores.a11y }}</div>
+                <div class="text-muted small">A11y</div>
+            </div>
+            <div class="col">
+                <div class="display-6 fw-bold {{ latestScores.perf >= 90 ? 'text-success' : latestScores.perf >= 50 ? 'text-warning' : 'text-danger' }}">{{ latestScores.perf }}</div>
+                <div class="text-muted small">Perf</div>
+            </div>
+            <div class="col">
+                <div class="display-6 fw-bold {{ latestScores.bp >= 90 ? 'text-success' : latestScores.bp >= 50 ? 'text-warning' : 'text-danger' }}">{{ latestScores.bp }}</div>
+                <div class="text-muted small">BP</div>
+            </div>
+            <div class="col">
+                <div class="display-6 fw-bold {{ latestScores.seo >= 90 ? 'text-success' : latestScores.seo >= 50 ? 'text-warning' : 'text-danger' }}">{{ latestScores.seo }}</div>
+                <div class="text-muted small">SEO</div>
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="card mb-4">
+        <div class="card-header py-2">
+            <h6 class="mb-0"><i class="fa-solid fa-chart-line"></i> Analyses</h6>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0" id="analysesTable">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Statut</th>
+                        <th class="text-center">Pages</th>
+                        <th>Durée</th>
+                        <th class="text-center">RGAA</th>
+                        <th class="text-center">A11y</th>
+                        <th class="text-center">Perf</th>
+                        <th class="text-center">BP</th>
+                        <th class="text-center">SEO</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set statusColors = {'completed': 'success', 'running': 'warning', 'failed': 'danger', 'cancelled': 'secondary', 'pending': 'secondary'} %}
+                    {% set statusLabels = {'completed': 'Terminée', 'running': 'En cours', 'failed': 'Échouée', 'cancelled': 'Arrêtée', 'pending': 'En attente'} %}
+                    {% macro scoreBadge(score) %}
+                        {% if score is not null %}
+                            {% set color = score >= 90 ? 'success' : (score >= 50 ? 'warning' : 'danger') %}
+                            <span class="badge bg-{{ color }}" style="font-size:0.95em; padding:0.4em 0.7em;">{{ score }}</span>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    {% endmacro %}
+                    {% for analysis in analyses %}
+                        {% set scores = analysisScores[analysis.id] ?? null %}
+                        <tr>
+                            <td>
+                                {% if analysis.status == 'running' %}
+                                    <a href="{{ path('audit_analysis_progress', {id: analysis.id}) }}" class="text-decoration-none">{{ analysis.createdAt|date('d/m/Y H:i') }}</a>
+                                {% else %}
+                                    <a href="{{ path('audit_analysis', {id: analysis.id}) }}" class="text-decoration-none">{{ analysis.createdAt|date('d/m/Y H:i') }}</a>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ statusColors[analysis.status] ?? 'secondary' }}">
+                                    {{ statusLabels[analysis.status] ?? analysis.status }}
+                                </span>
+                                {% if analysis.errorMessage %}
+                                    <small class="text-danger d-block">{{ analysis.errorMessage }}</small>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">{{ analysis.pagesCrawled }}/{{ analysis.totalPages }}</td>
+                            <td>{{ analysis.duration ?? '-' }}</td>
+                            <td class="text-center">{{ _self.scoreBadge(scores.rgaa ?? null) }}</td>
+                            <td class="text-center">{{ _self.scoreBadge(scores.a11y ?? null) }}</td>
+                            <td class="text-center">{{ _self.scoreBadge(scores.perf ?? null) }}</td>
+                            <td class="text-center">{{ _self.scoreBadge(scores.bp ?? null) }}</td>
+                            <td class="text-center">{{ _self.scoreBadge(scores.seo ?? null) }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
 
 <div class="card mb-4">
     <div class="card-header py-2 d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#excludeSection" role="button">
@@ -99,62 +200,6 @@
         </div>
     </div>
 </div>
-
-{% if analyses is not empty %}
-    <div class="card">
-        <div class="card-header py-2">
-            <h6 class="mb-0"><i class="fa-solid fa-chart-line"></i> Analyses</h6>
-        </div>
-        <div class="table-responsive">
-            <table class="table table-hover table-sm mb-0" id="analysesTable">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Statut</th>
-                        <th class="text-center">Pages</th>
-                        <th>Durée</th>
-                        <th class="text-end no-sort"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% set statusColors = {'completed': 'success', 'running': 'warning', 'failed': 'danger', 'cancelled': 'secondary', 'pending': 'secondary'} %}
-                    {% set statusLabels = {'completed': 'Terminée', 'running': 'En cours', 'failed': 'Échouée', 'cancelled': 'Arrêtée', 'pending': 'En attente'} %}
-                    {% for analysis in analyses %}
-                        <tr>
-                            <td>{{ analysis.createdAt|date('d/m/Y H:i') }}</td>
-                            <td>
-                                <span class="badge bg-{{ statusColors[analysis.status] ?? 'secondary' }}">
-                                    {{ statusLabels[analysis.status] ?? analysis.status }}
-                                </span>
-                                {% if analysis.errorMessage %}
-                                    <small class="text-danger d-block">{{ analysis.errorMessage }}</small>
-                                {% endif %}
-                            </td>
-                            <td class="text-center">{{ analysis.pagesCrawled }}/{{ analysis.totalPages }}</td>
-                            <td>{{ analysis.duration ?? '-' }}</td>
-                            <td class="text-end text-nowrap">
-                                {% if analysis.status == 'running' %}
-                                    <a href="{{ path('audit_analysis_progress', {id: analysis.id}) }}" class="btn btn-xs btn-outline-warning" title="Suivre">
-                                        <i class="fa-solid fa-spinner fa-spin"></i>
-                                    </a>
-                                {% else %}
-                                    <a href="{{ path('audit_analysis', {id: analysis.id}) }}" class="btn btn-xs btn-outline-primary" title="Voir">
-                                        <i class="fa-solid fa-eye"></i>
-                                    </a>
-                                    <form method="post" action="{{ path('audit_analysis_delete', {id: analysis.id}) }}" class="d-inline" onsubmit="return confirm('Supprimer cette analyse ?')">
-                                        <button type="submit" class="btn btn-xs btn-outline-danger" title="Supprimer">
-                                            <i class="fa-solid fa-trash"></i>
-                                        </button>
-                                    </form>
-                                {% endif %}
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-{% endif %}
 
 <script>
 let excludePatternIdx = 0;
@@ -192,6 +237,39 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+
+<div class="modal fade" id="editSiteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="post" action="{{ path('audit_site_edit', {id: site.id}) }}">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fa-solid fa-pen"></i> Modifier le site</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="edit_name" class="form-label">Nom</label>
+                        <input type="text" class="form-control" id="edit_name" name="name" value="{{ site.name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_root_url" class="form-label">URL racine</label>
+                        <input type="url" class="form-control" id="edit_root_url" name="root_url" value="{{ site.rootUrl }}" required>
+                        <div class="form-text">URL utilisée pour le crawl et l'analyse.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_prod_url" class="form-label">URL PROD</label>
+                        <input type="url" class="form-control" id="edit_prod_url" name="prod_url" value="{{ site.prodUrl ?? '' }}">
+                        <div class="form-text">URL de production visible (pour référence uniquement).</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Enregistrer</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}
 
 {% block localscript %}
@@ -201,7 +279,6 @@ document.addEventListener('DOMContentLoaded', function() {
             order: [[0, 'desc']],
             pageLength: 25,
             language: { lengthMenu: 'Afficher _MENU_ analyses' },
-            columnDefs: [{ targets: 'no-sort', orderable: false }],
             searching: false
         });
     });

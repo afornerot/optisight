@@ -40,23 +40,9 @@ class Pa11yService
         ];
 
         if ($cookieHeader !== null) {
-            $cookies = [];
-            $pairs = explode(';', $cookieHeader);
-            foreach ($pairs as $pair) {
-                $pair = trim($pair);
-                $pos = strpos($pair, '=');
-                if ($pos !== false) {
-                    $cookies[] = [
-                        'name' => substr($pair, 0, $pos),
-                        'value' => substr($pair, $pos + 1),
-                        'domain' => parse_url($url, PHP_URL_HOST),
-                        'path' => '/',
-                    ];
-                }
-            }
-            if (!empty($cookies)) {
-                $config['cookies'] = $cookies;
-            }
+            $config['headers'] = [
+                'Cookie' => $cookieHeader,
+            ];
         }
 
         $configFile = tempnam(sys_get_temp_dir(), 'pa11y_') . '.json';

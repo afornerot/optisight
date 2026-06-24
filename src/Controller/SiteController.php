@@ -75,6 +75,11 @@ class SiteController extends AbstractController
             $site->setName($request->request->get('name'));
             $site->setRootUrl($request->request->get('root_url'));
 
+            $prodUrl = $request->request->get('prod_url');
+            if ($prodUrl) {
+                $site->setProdUrl($prodUrl);
+            }
+
             $this->saveExcludePatterns($site, $request);
 
             $this->em->persist($site);
@@ -100,9 +105,38 @@ class SiteController extends AbstractController
         $analyses = $this->em->getRepository(Analysis::class)
             ->findBy(['site' => $site], ['createdAt' => 'DESC']);
 
+        $analysisScores = [];
+        foreach ($analyses as $analysis) {
+            if ($analysis->getStatus() !== 'completed') {
+                continue;
+            }
+            $reports = $this->em->getRepository(PageReport::class)
+                ->findBy(['analysis' => $analysis]);
+            $count = count($reports);
+            if ($count === 0) {
+                continue;
+            }
+            $avgRgaa = $avgA11y = $avgPerf = $avgBp = $avgSeo = 0;
+            foreach ($reports as $r) {
+                $avgRgaa += ($r->getRgaaScore() ?? 0);
+                $avgA11y += ($r->getLhAccessibility() ?? 0);
+                $avgPerf += ($r->getLhPerformance() ?? 0);
+                $avgBp += ($r->getLhBestPractices() ?? 0);
+                $avgSeo += ($r->getLhSeo() ?? 0);
+            }
+            $analysisScores[$analysis->getId()] = [
+                'rgaa' => round($avgRgaa / $count),
+                'a11y' => round($avgA11y / $count),
+                'perf' => round($avgPerf / $count),
+                'bp'   => round($avgBp / $count),
+                'seo'  => round($avgSeo / $count),
+            ];
+        }
+
         return $this->render('audit/site.html.twig', [
             'site' => $site,
             'analyses' => $analyses,
+            'analysisScores' => $analysisScores,
             'usemenu' => true,
         ]);
     }
@@ -147,6 +181,23 @@ class SiteController extends AbstractController
             'site' => $site,
             'usemenu' => true,
         ]);
+    }
+
+    #[Route('/{id}/edit', name: 'audit_site_edit', methods: ['POST'])]
+    public function edit(int $id, Request $request): Response
+    {
+        $site = $this->em->getRepository(Site::class)->find($id);
+        if (!$site) {
+            throw $this->createNotFoundException('Site non trouvé');
+        }
+
+        $site->setName($request->request->get('name'));
+        $site->setRootUrl($request->request->get('root_url'));
+        $site->setProdUrl($request->request->get('prod_url') ?: null);
+        $this->em->flush();
+
+        $this->addFlash('success', 'Informations du site mises à jour.');
+        return $this->redirectToRoute('audit_site', ['id' => $id]);
     }
 
     #[Route('/{id}/exclude', name: 'audit_exclude', methods: ['POST'])]

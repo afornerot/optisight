@@ -96,7 +96,7 @@ class CrawlerService
                     'metaDescription' => $this->extractMetaDescription($body),
                     'h1Count' => $this->countH1($body),
                     'canonical' => $this->extractCanonical($body),
-                    'links' => $this->extractInternalLinks($body, $baseHost, $isExcluded),
+                    'links' => $this->extractInternalLinks($body, $baseHost, $isExcluded, $rootUrl),
                 ];
                 $pages[] = $page;
 
@@ -166,7 +166,7 @@ class CrawlerService
         return substr_count(strtolower($html), '<h1');
     }
 
-    private function extractInternalLinks(string $html, string $baseHost, ?callable $isExcluded = null): array
+    private function extractInternalLinks(string $html, string $baseHost, ?callable $isExcluded = null, string $baseUrl = ''): array
     {
         $links = [];
 
@@ -179,9 +179,12 @@ class CrawlerService
                 }
 
                 if (str_starts_with($href, '//')) {
-                    $href = 'https:' . $href;
+                    $href = parse_url($baseUrl, PHP_URL_SCHEME) . ':' . $href;
                 } elseif (str_starts_with($href, '/')) {
-                    $href = 'https://' . $baseHost . $href;
+                    $scheme = parse_url($baseUrl, PHP_URL_SCHEME) ?: 'https';
+                    $port = parse_url($baseUrl, PHP_URL_PORT);
+                    $host = $baseHost . ($port ? ':' . $port : '');
+                    $href = $scheme . '://' . $host . $href;
                 }
 
                 $fragment = parse_url($href, PHP_URL_FRAGMENT);
@@ -190,7 +193,11 @@ class CrawlerService
                 }
 
                 $linkHost = parse_url($href, PHP_URL_HOST);
-                if ($linkHost === $baseHost) {
+                $linkPort = parse_url($href, PHP_URL_PORT);
+                $basePort = parse_url($baseUrl, PHP_URL_PORT);
+                $baseAuthority = $baseHost . ($basePort ? ':' . $basePort : '');
+                $linkAuthority = $linkHost . ($linkPort ? ':' . $linkPort : '');
+                if ($linkAuthority === $baseAuthority) {
                     $normalized = rtrim($href, '/');
                     if (!$isExcluded || !$isExcluded($normalized)) {
                         $links[] = $normalized;

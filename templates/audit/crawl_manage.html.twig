@@ -58,14 +58,13 @@
                     <th class="text-center">Status</th>
                     <th class="text-center">Depth</th>
                     <th>Titre</th>
-                    <th class="text-center no-sort" style="width:80px;"></th>
                 </tr>
             </thead>
             <tbody>
                 {% for page in pages %}
                     <tr>
-                        <td style="max-width:500px;">
-                            <span class="text-break" style="font-size:0.88em;">{{ page.url }}</span>
+                        <td>
+                            <a href="#" class="text-decoration-none text-break" style="font-size:0.88em;" title="Modifier" onclick="openEditModal({{ loop.index0 }}, {{ page|json_encode|e('html') }}); return false;">{{ page.url }}</a>
                         </td>
                         <td class="text-center">
                             <span class="badge bg-{{ page.status >= 200 and page.status < 300 ? 'success' : page.status >= 300 and page.status < 400 ? 'info' : 'danger' }}">{{ page.status }}</span>
@@ -73,16 +72,6 @@
                         <td class="text-center">{{ page.depth }}</td>
                         <td style="max-width:250px;">
                             <span class="text-truncate d-inline-block" style="max-width:230px;" title="{{ page.title ?? '' }}">{{ page.title ?? '-' }}</span>
-                        </td>
-                        <td class="text-center">
-                            <button type="button" class="btn btn-link btn-sm p-0 me-1 text-primary" title="Modifier" onclick="openEditModal({{ loop.index0 }}, {{ page|json_encode|e('html') }})">
-                                <i class="fa-solid fa-pen"></i>
-                            </button>
-                            <form method="post" action="{{ path('audit_crawl_manage_delete', {id: site.id, index: loop.index0}) }}" class="d-inline" onsubmit="return confirm('Supprimer cette page du crawl et des analyses ?')">
-                                <button type="submit" class="btn btn-link btn-sm p-0 text-danger" title="Supprimer">
-                                    <i class="fa-solid fa-xmark"></i>
-                                </button>
-                            </form>
                         </td>
                     </tr>
                 {% endfor %}
@@ -185,6 +174,9 @@
                     </div>
                 </div>
                 <div class="modal-footer">
+                    <button type="button" class="btn btn-danger me-auto" onclick="submitDeletePage()">
+                        <i class="fa-solid fa-trash"></i> Supprimer
+                    </button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
                     <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Enregistrer</button>
                 </div>
@@ -192,6 +184,8 @@
         </form>
     </div>
 </div>
+
+<form method="post" id="deletePageForm" class="d-none"></form>
 {% endblock %}
 
 {% block localscript %}
@@ -200,8 +194,7 @@
         $('#crawlPagesTable').DataTable({
             order: [[0, 'asc']],
             pageLength: 50,
-            language: { lengthMenu: 'Afficher _MENU_ pages' },
-            columnDefs: [{ targets: 'no-sort', orderable: false }]
+            language: { lengthMenu: 'Afficher _MENU_ pages' }
         });
     });
 
@@ -217,7 +210,16 @@
         document.getElementById('edit_h1Count').value = pageData.h1Count || 0;
         document.getElementById('edit_canonical').value = pageData.canonical || '';
 
+        const deleteForm = document.getElementById('deletePageForm');
+        deleteForm.action = '{{ path("audit_crawl_manage_delete", {id: site.id, index: "__INDEX__"}) }}'.replace('__INDEX__', index);
+
         new bootstrap.Modal(document.getElementById('editPageModal')).show();
+    }
+
+    function submitDeletePage() {
+        if (confirm('Supprimer cette page du crawl et des analyses ?')) {
+            document.getElementById('deletePageForm').submit();
+        }
     }
 </script>
 {% endblock %}

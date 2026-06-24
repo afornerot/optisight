@@ -100,6 +100,7 @@ class ApiController extends AbstractController
                 'id' => $site->getId(),
                 'name' => $site->getName(),
                 'rootUrl' => $site->getRootUrl(),
+                'prodUrl' => $site->getProdUrl(),
                 'lastAnalysis' => $analysisId ? [
                     'id' => $analysisId,
                     'date' => $analysisDate,

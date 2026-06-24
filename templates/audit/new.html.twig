@@ -30,6 +30,12 @@
                         <div class="form-text">L'analyse commencera à cette URL et explorera toutes les pages liées.</div>
                     </div>
                     <div class="mb-3">
+                        <label for="prod_url" class="form-label">URL PROD</label>
+                        <input type="url" class="form-control" id="prod_url" name="prod_url"
+                               placeholder="https://www.example.com">
+                        <div class="form-text">URL de production visible (pour référence uniquement, pas utilisée pour l'analyse).</div>
+                    </div>
+                    <div class="mb-3">
                         <label for="auth_type" class="form-label">Authentification</label>
                         <select class="form-select" id="auth_type" name="auth_type">
                             <option value="" selected>Aucune authentification</option>

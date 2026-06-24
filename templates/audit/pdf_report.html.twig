@@ -45,7 +45,7 @@
 
     <h1>Rapport d'audit web</h1>
     <div class="meta">
-        Site : <strong>{{ site.name }}</strong> ({{ site.rootUrl }})<br>
+        Site : <strong>{{ site.name }}</strong> ({{ site.rootUrl }}){% if site.prodUrl %} — PROD : {{ site.prodUrl }}{% endif %}<br>
         Date de l'analyse : {{ analysis.getCreatedAt()|date('d/m/Y à H:i') }}<br>
         Pages analysées : {{ reports|length }}
         {% if analysis.getDuration() %} — Durée : {{ analysis.getDuration() }}{% endif %}
