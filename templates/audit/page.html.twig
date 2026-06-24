@@ -30,6 +30,11 @@
                 <button type="button" class="btn btn-outline-warning btn-sm" onclick="launchReanalyze()" id="reanalyze-btn">
                     <i class="fa-solid fa-rotate"></i> Relancer Lighthouse + pa11y
                 </button>
+                <form method="post" action="{{ path('audit_analysis_page_delete', {id: analysis.id, reportId: report.id}) }}" class="d-inline ms-2" onsubmit="return confirm('Supprimer cette page ?')">
+                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                        <i class="fa-solid fa-trash"></i> Supprimer
+                    </button>
+                </form>
             </div>
             <div class="card-body">
                 <div id="reanalyze-console" class="d-none mb-3 p-3 text-white bg-dark" style="border-radius: 0.375rem; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.85em; white-space: pre-wrap;"></div>

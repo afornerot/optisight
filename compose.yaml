@@ -1,23 +1,23 @@
 services:
   mariadb:
     image: mariadb
-    container_name: iargaaseo-mariadb
+    container_name: optisight-mariadb
     restart: unless-stopped  
     environment:
       MYSQL_ROOT_PASSWORD: changeme
-      MYSQL_DATABASE: iargaaseo
+      MYSQL_DATABASE: optisight
       MYSQL_USER: user
       MYSQL_PASSWORD: changeme
     volumes:
       - ./volume/mariadb:/var/lib/mysql
 
-  iargaaseo:
+  optisight:
     build:
       context: .
       dockerfile: ./misc/docker/Dockerfile
-    container_name: iargaaseo
+    container_name: optisight
     restart: unless-stopped  
-    image: reg.cadoles.com/envole/iargaaseo
+    image: reg.cadoles.com/envole/optisight
     depends_on: 
       - mariadb
     ports:
@@ -34,7 +34,7 @@ services:
 
   adminer:
     image: adminer
-    container_name: iargaaseo-adminer
+    container_name: optisight-adminer
     restart: always
     ports:
       - 6027:8080

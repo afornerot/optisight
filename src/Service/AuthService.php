@@ -113,7 +113,7 @@ class AuthService
                 'const url = new URL(process.argv[1]);'.
                 'const mod = url.protocol === "https:" ? https : http;'.
                 'const req = mod.get(url.href, {'.
-                '  headers: { Cookie: process.argv[2], "User-Agent": "iargaaseo-test/1.0" },'.
+                '  headers: { Cookie: process.argv[2], "User-Agent": "optisight-test/1.0" },'.
                 '  timeout: 10000,'.
                 '}, res => {'.
                 '  process.stdout.write(JSON.stringify({ success: res.statusCode < 400, statusCode: res.statusCode }));'.

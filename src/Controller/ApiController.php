@@ -25,7 +25,7 @@ class ApiController extends AbstractController
     public function index(): JsonResponse
     {
         return $this->json([
-            'name' => 'iargaaseo API',
+            'name' => 'OptiSight API',
             'version' => '1.0.0',
             'endpoints' => [
                 'GET /v1/api' => 'This endpoint',

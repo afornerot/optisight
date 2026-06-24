@@ -16,134 +16,113 @@
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
 {% endfor %}
+{% for message in app.flashes('warning') %}
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+{% endfor %}
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h1 class="h3 mb-0">{{ site.name }}</h1>
         <code class="text-muted">{{ site.rootUrl }}</code>
-        {% if site.authType == 'cookie' %}
+        {% if site.authType %}
             <span class="badge bg-warning text-dark ms-2"><i class="fa-solid fa-lock"></i> Protégé</span>
         {% endif %}
+        {% if site.lastCrawledAt %}
+            <span class="text-muted ms-2 small"><i class="fa-solid fa-spider"></i> {{ site.crawledPages }} pages crawlées</span>
+        {% endif %}
     </div>
-    <div>
-        <a href="{{ path('audit_auth', {id: site.id}) }}" class="btn btn-outline-warning btn-sm">
-            <i class="fa-solid fa-key"></i> Authentification
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+        <a href="{{ path('audit_auth', {id: site.id}) }}" class="btn btn-outline-warning btn-sm" title="Authentification">
+            <i class="fa-solid fa-key"></i> Auth
         </a>
+        <a href="{{ path('audit_crawl_manage', {id: site.id}) }}" class="btn btn-outline-secondary btn-sm" title="Gérer les pages crawlées">
+            <i class="fa-solid fa-list"></i> Pages
+        </a>
+        {% if site.crawlStatus == 'completed' %}
+            <a href="{{ path('audit_crawl_page', {id: site.id}) }}" class="btn btn-outline-primary btn-sm">
+                <i class="fa-solid fa-rotate"></i> Recrawler
+            </a>
+            <form method="post" action="{{ path('audit_analyze', {id: site.id}) }}" class="d-inline">
+                <button type="submit" class="btn btn-success btn-sm">
+                    <i class="fa-solid fa-play"></i> Analyser
+                </button>
+            </form>
+        {% elseif site.crawlStatus != 'running' %}
+            <a href="{{ path('audit_crawl_page', {id: site.id}) }}" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-spider"></i> Crawler
+            </a>
+        {% else %}
+            <span class="btn btn-outline-warning btn-sm disabled">
+                <span class="spinner-border spinner-border-sm"></span> Crawl en cours
+            </span>
+        {% endif %}
         <form method="post" action="{{ path('audit_delete', {id: site.id}) }}" class="d-inline" onsubmit="return confirm('Supprimer ce site et toutes ses analyses ?')">
-            <button type="submit" class="btn btn-outline-danger btn-sm">
-                <i class="fa-solid fa-trash"></i> Supprimer
+            <button type="submit" class="btn btn-outline-danger btn-sm" title="Supprimer le site">
+                <i class="fa-solid fa-trash"></i>
             </button>
         </form>
     </div>
 </div>
 
-{# Exclude patterns #}
 <div class="card mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="fa-solid fa-ban"></i> Exclusions de pages</h5>
-        {% if site.excludePatterns is not empty %}
-            <span class="badge bg-secondary">{{ site.excludePatterns|length }} règle(s)</span>
-        {% endif %}
+    <div class="card-header py-2 d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#excludeSection" role="button">
+        <h6 class="mb-0"><i class="fa-solid fa-ban"></i> Exclusions
+            {% if site.excludePatterns is not empty %}
+                <span class="badge bg-secondary ms-1">{{ site.excludePatterns|length }}</span>
+            {% endif %}
+        </h6>
+        <i class="fa-solid fa-chevron-down small"></i>
     </div>
-    <div class="card-body">
-        <form method="post" action="{{ path('audit_exclude', {id: site.id}) }}">
-            <div id="exclude-patterns" class="mb-2"></div>
-            <div class="d-flex gap-2">
-                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addExcludePattern()">
-                    <i class="fa-solid fa-plus"></i> Ajouter une règle
-                </button>
-                <button type="submit" class="btn btn-primary btn-sm">
-                    <i class="fa-solid fa-save"></i> Enregistrer
-                </button>
-            </div>
-            <div class="form-text mt-2">Excluez des pages du crawl et de l'analyse. Le chemin testé est celui après le domaine (ex: <code>/admin</code>, <code>/api</code>).</div>
-        </form>
-    </div>
-</div>
-
-{# Crawl section #}
-<div class="card mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="fa-solid fa-spider"></i> Crawl</h5>
-        {% if site.lastCrawledAt %}
-            <span class="text-muted small">Dernier crawl : {{ site.lastCrawledAt|date('d/m/Y H:i') }} — {{ site.crawledPages }} pages</span>
-        {% endif %}
-    </div>
-    <div class="card-body">
-        {% if site.crawlStatus == 'running' %}
-            <div class="d-flex align-items-center text-warning">
-                <span class="spinner-border spinner-border-sm me-2"></span>
-                Crawl en cours...
-            </div>
-        {% elseif site.crawlStatus == 'completed' %}
-            <p class="mb-2">{{ site.crawledPages }} pages découvertes le {{ site.lastCrawledAt|date('d/m/Y à H:i') }}.</p>
-            <a href="{{ path('audit_crawl_page', {id: site.id}) }}" class="btn btn-outline-primary btn-sm">
-                <i class="fa-solid fa-rotate"></i> Actualiser le crawl
-            </a>
-        {% else %}
-            <p class="text-muted mb-2">Aucun crawl effectué. Lancez un crawl pour découvrir les pages du site avant de lancer une analyse.</p>
-            <a href="{{ path('audit_crawl_page', {id: site.id}) }}" class="btn btn-primary btn-sm">
-                <i class="fa-solid fa-spider"></i> Lancer le crawl
-            </a>
-        {% endif %}
-    </div>
-</div>
-
-{# Analyze section #}
-<div class="card mb-4">
-    <div class="card-header">
-        <h5 class="mb-0"><i class="fa-solid fa-chart-line"></i> Analyse RGAA + IA</h5>
-    </div>
-    <div class="card-body">
-        {% if site.crawlStatus == 'completed' and site.crawledPages > 0 %}
-            <p class="text-muted mb-2">{{ site.crawledPages }} pages prêtes pour l'analyse.</p>
-            <form method="post" action="{{ path('audit_analyze', {id: site.id}) }}" class="d-inline">
-                <button type="submit" class="btn btn-success">
-                    <i class="fa-solid fa-play"></i> Lancer une analyse RGAA
-                </button>
+    <div class="collapse {{ site.excludePatterns is not empty ? 'show' : '' }}" id="excludeSection">
+        <div class="card-body pt-0 pb-3">
+            <form method="post" action="{{ path('audit_exclude', {id: site.id}) }}">
+                <div id="exclude-patterns" class="mb-2"></div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addExcludePattern()">
+                        <i class="fa-solid fa-plus"></i> Ajouter
+                    </button>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fa-solid fa-save"></i> Enregistrer
+                    </button>
+                    {% if site.excludePatterns is not empty %}
+                        <form method="post" action="{{ path('audit_exclude_clean', {id: site.id}) }}" class="d-inline" onsubmit="return confirm('Supprimer toutes les pages correspondant aux règles d\'exclusion de TOUTES les analyses ?')">
+                            <button type="submit" class="btn btn-outline-danger btn-sm">
+                                <i class="fa-solid fa-broom"></i> Appliquer
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
             </form>
-        {% else %}
-            <p class="text-muted mb-0">Vous devez d'abord crawler le site.</p>
-        {% endif %}
+        </div>
     </div>
 </div>
 
-{# Analyses list #}
 {% if analyses is not empty %}
     <div class="card">
-        <div class="card-header">
-            <h5 class="mb-0">Analyses</h5>
+        <div class="card-header py-2">
+            <h6 class="mb-0"><i class="fa-solid fa-chart-line"></i> Analyses</h6>
         </div>
         <div class="table-responsive">
-            <table class="table table-hover mb-0" id="analysesTable">
+            <table class="table table-hover table-sm mb-0" id="analysesTable">
                 <thead>
                     <tr>
                         <th>Date</th>
                         <th>Statut</th>
-                        <th>Pages</th>
+                        <th class="text-center">Pages</th>
                         <th>Durée</th>
-                        <th class="text-end">Actions</th>
+                        <th class="text-end no-sort"></th>
                     </tr>
                 </thead>
                 <tbody>
+                    {% set statusColors = {'completed': 'success', 'running': 'warning', 'failed': 'danger', 'cancelled': 'secondary', 'pending': 'secondary'} %}
+                    {% set statusLabels = {'completed': 'Terminée', 'running': 'En cours', 'failed': 'Échouée', 'cancelled': 'Arrêtée', 'pending': 'En attente'} %}
                     {% for analysis in analyses %}
                         <tr>
                             <td>{{ analysis.createdAt|date('d/m/Y H:i') }}</td>
                             <td>
-                                {% set statusColors = {
-                                    'completed': 'success',
-                                    'running': 'warning',
-                                    'failed': 'danger',
-                                    'cancelled': 'secondary',
-                                    'pending': 'secondary'
-                                } %}
-                                {% set statusLabels = {
-                                    'completed': 'Terminée',
-                                    'running': 'En cours',
-                                    'failed': 'Échouée',
-                                    'cancelled': 'Arrêtée',
-                                    'pending': 'En attente'
-                                } %}
                                 <span class="badge bg-{{ statusColors[analysis.status] ?? 'secondary' }}">
                                     {{ statusLabels[analysis.status] ?? analysis.status }}
                                 </span>
@@ -151,21 +130,19 @@
                                     <small class="text-danger d-block">{{ analysis.errorMessage }}</small>
                                 {% endif %}
                             </td>
-                            <td>{{ analysis.pagesCrawled }}/{{ analysis.totalPages }}</td>
+                            <td class="text-center">{{ analysis.pagesCrawled }}/{{ analysis.totalPages }}</td>
                             <td>{{ analysis.duration ?? '-' }}</td>
-                            <td class="text-end">
+                            <td class="text-end text-nowrap">
                                 {% if analysis.status == 'running' %}
-                                    <a href="{{ path('audit_analysis_progress', {id: analysis.id}) }}" class="btn btn-sm btn-outline-warning">
-                                        <i class="fa-solid fa-spinner fa-spin"></i> Suivre
+                                    <a href="{{ path('audit_analysis_progress', {id: analysis.id}) }}" class="btn btn-xs btn-outline-warning" title="Suivre">
+                                        <i class="fa-solid fa-spinner fa-spin"></i>
                                     </a>
                                 {% else %}
-                                    <a href="{{ path('audit_analysis', {id: analysis.id}) }}" class="btn btn-sm btn-outline-primary">
-                                        <i class="fa-solid fa-eye"></i> Voir
+                                    <a href="{{ path('audit_analysis', {id: analysis.id}) }}" class="btn btn-xs btn-outline-primary" title="Voir">
+                                        <i class="fa-solid fa-eye"></i>
                                     </a>
-                                {% endif %}
-                                {% if analysis.status != 'running' %}
-                                    <form method="post" action="{{ path('audit_analysis_delete', {id: analysis.id}) }}" class="d-inline" onsubmit="return confirm('Supprimer cette analyse et tous ses rapports ?')">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <form method="post" action="{{ path('audit_analysis_delete', {id: analysis.id}) }}" class="d-inline" onsubmit="return confirm('Supprimer cette analyse ?')">
+                                        <button type="submit" class="btn btn-xs btn-outline-danger" title="Supprimer">
                                             <i class="fa-solid fa-trash"></i>
                                         </button>
                                     </form>
@@ -188,16 +165,16 @@ function addExcludePattern(type, value) {
     value = value || '';
     const container = document.getElementById('exclude-patterns');
     const row = document.createElement('div');
-    row.className = 'input-group mb-2';
+    row.className = 'input-group input-group-sm mb-1';
     row.innerHTML =
-        '<select class="form-select" name="exclude_type[]" style="max-width:180px;">' +
+        '<select class="form-select form-select-sm" name="exclude_type[]" style="max-width:140px;">' +
             '<option value="starts_with"' + (type === 'starts_with' ? ' selected' : '') + '>Commence par</option>' +
             '<option value="contains"' + (type === 'contains' ? ' selected' : '') + '>Contient</option>' +
             '<option value="ends_with"' + (type === 'ends_with' ? ' selected' : '') + '>Finit par</option>' +
             '<option value="equals"' + (type === 'equals' ? ' selected' : '') + '>Égal à</option>' +
         '</select>' +
-        '<input type="text" class="form-control" name="exclude_value[]" placeholder="/admin, /api, .pdf" value="' + escHtml(value) + '">' +
-        '<button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()"><i class="fa-solid fa-xmark"></i></button>';
+        '<input type="text" class="form-control form-control-sm" name="exclude_value[]" placeholder="/admin, /api" value="' + escHtml(value) + '">' +
+        '<button type="button" class="btn btn-outline-danger btn-sm" onclick="this.parentElement.remove()"><i class="fa-solid fa-xmark"></i></button>';
     container.appendChild(row);
 }
 
@@ -223,7 +200,9 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#analysesTable').DataTable({
             order: [[0, 'desc']],
             pageLength: 25,
-            language: { lengthMenu: 'Afficher _MENU_ analyses' }
+            language: { lengthMenu: 'Afficher _MENU_ analyses' },
+            columnDefs: [{ targets: 'no-sort', orderable: false }],
+            searching: false
         });
     });
 </script>

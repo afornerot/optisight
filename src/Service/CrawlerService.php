@@ -60,7 +60,7 @@ class CrawlerService
             $statusCode = null;
             try {
                 $headers = [
-                    'User-Agent' => ($_ENV['CRAWL_USER_AGENT'] ?? 'iargaaseo-bot/1.0'),
+                    'User-Agent' => ($_ENV['CRAWL_USER_AGENT'] ?? 'optisight-bot/1.0'),
                 ];
                 if ($cookieHeader !== null) {
                     $headers['Cookie'] = $cookieHeader;

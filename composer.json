@@ -19,6 +19,7 @@
         "guzzlehttp/guzzle": "^7.9",
         "jumbojett/openid-connect-php": "^1.0",
         "league/commonmark": "^2.7",
+        "nelmio/api-doc-bundle": "^5.10",
         "okvpn/cron-bundle": "^1.1",
         "oneup/uploader-bundle": "^5.0",
         "phpdocumentor/reflection-docblock": "^5.4",

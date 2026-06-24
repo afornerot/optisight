@@ -59,6 +59,7 @@ class RunAnalysisCommand extends Command
 
         try {
             $rootUrl = $analysis->getSite()->getRootUrl();
+            $cookieHeader = $analysis->getSite()->getCookieHeader();
 
             $pages = $this->crawler->crawl(
                 $rootUrl,
@@ -74,10 +75,14 @@ class RunAnalysisCommand extends Command
                         ['id' => $id]
                     );
                     return $status === Analysis::STATUS_CANCELLED;
-                }
+                },
+                null,
+                $cookieHeader
             );
 
             $output->writeln("Crawl done: " . count($pages) . " pages found.");
+
+            $cookieHeader = $analysis->getSite()->getCookieHeader();
 
             $analysis->setTotalPages(count($pages));
             $this->em->flush();
@@ -98,7 +103,7 @@ class RunAnalysisCommand extends Command
                     'depth' => $page['depth'],
                 ]);
 
-                $lhResult = $this->lighthouse->analyze($page['url']);
+                $lhResult = $this->lighthouse->analyze($page['url'], $cookieHeader);
                 if ($lhResult) {
                     $report->setLhPerformance($lhResult['performance']);
                     $report->setLhAccessibility($lhResult['accessibility']);
@@ -107,7 +112,7 @@ class RunAnalysisCommand extends Command
                     $report->setLighthouseReport($lhResult['raw']);
                 }
 
-                $paResult = $this->pa11y->analyze($page['url']);
+                $paResult = $this->pa11y->analyze($page['url'], $cookieHeader);
                 if ($paResult) {
                     $report->setRgaaScore($paResult['score']);
                     $report->setRgaaErrors($paResult['errors']);

@@ -1,0 +1,223 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Pages crawlées - {{ site.name }}{% endblock %}
+
+{% block body %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ path('audit_index') }}">Audit</a></li>
+        <li class="breadcrumb-item"><a href="{{ path('audit_site', {id: site.id}) }}">{{ site.name }}</a></li>
+        <li class="breadcrumb-item active">Pages crawlées</li>
+    </ol>
+</nav>
+
+{% for message in app.flashes('success') %}
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+{% endfor %}
+{% for message in app.flashes('warning') %}
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+{% endfor %}
+{% for message in app.flashes('danger') %}
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+{% endfor %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-0">Pages crawlées</h1>
+        <span class="text-muted">{{ pages|length }} page(s) pour {{ site.name }}</span>
+    </div>
+    <div>
+        <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addPageModal">
+            <i class="fa-solid fa-plus"></i> Ajouter une page
+        </button>
+        {% if site.excludePatterns is not empty %}
+            <form method="post" action="{{ path('audit_crawl_manage_delete_excluded', {id: site.id}) }}" class="d-inline" onsubmit="return confirm('Supprimer toutes les pages correspondant aux règles d\'exclusion ?')">
+                <button type="submit" class="btn btn-outline-danger btn-sm">
+                    <i class="fa-solid fa-broom"></i> Supprimer les pages exclues
+                </button>
+            </form>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0" id="crawlPagesTable">
+            <thead>
+                <tr>
+                    <th>URL</th>
+                    <th class="text-center">Status</th>
+                    <th class="text-center">Depth</th>
+                    <th>Titre</th>
+                    <th class="text-center no-sort" style="width:80px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for page in pages %}
+                    <tr>
+                        <td style="max-width:500px;">
+                            <span class="text-break" style="font-size:0.88em;">{{ page.url }}</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-{{ page.status >= 200 and page.status < 300 ? 'success' : page.status >= 300 and page.status < 400 ? 'info' : 'danger' }}">{{ page.status }}</span>
+                        </td>
+                        <td class="text-center">{{ page.depth }}</td>
+                        <td style="max-width:250px;">
+                            <span class="text-truncate d-inline-block" style="max-width:230px;" title="{{ page.title ?? '' }}">{{ page.title ?? '-' }}</span>
+                        </td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-link btn-sm p-0 me-1 text-primary" title="Modifier" onclick="openEditModal({{ loop.index0 }}, {{ page|json_encode|e('html') }})">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                            <form method="post" action="{{ path('audit_crawl_manage_delete', {id: site.id, index: loop.index0}) }}" class="d-inline" onsubmit="return confirm('Supprimer cette page du crawl et des analyses ?')">
+                                <button type="submit" class="btn btn-link btn-sm p-0 text-danger" title="Supprimer">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal fade" id="addPageModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="post" action="{{ path('audit_crawl_manage_add', {id: site.id}) }}">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fa-solid fa-plus"></i> Ajouter une page</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">URL <span class="text-danger">*</span></label>
+                        <input type="url" name="url" class="form-control" required placeholder="https://example.com/page">
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label">Status HTTP</label>
+                            <input type="number" name="status" class="form-control" value="200">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Depth</label>
+                            <input type="number" name="depth" class="form-control" value="0">
+                        </div>
+                    </div>
+                    <div class="mb-3 mt-3">
+                        <label class="form-label">Titre</label>
+                        <input type="text" name="title" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Meta description</label>
+                        <input type="text" name="metaDescription" class="form-control">
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label">H1 count</label>
+                            <input type="number" name="h1Count" class="form-control" value="0">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Canonical</label>
+                            <input type="text" name="canonical" class="form-control">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Ajouter</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="editPageModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="post" id="editPageForm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fa-solid fa-pen"></i> Modifier la page</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">URL <span class="text-danger">*</span></label>
+                        <input type="url" name="url" id="edit_url" class="form-control" required>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label">Status HTTP</label>
+                            <input type="number" name="status" id="edit_status" class="form-control">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Depth</label>
+                            <input type="number" name="depth" id="edit_depth" class="form-control">
+                        </div>
+                    </div>
+                    <div class="mb-3 mt-3">
+                        <label class="form-label">Titre</label>
+                        <input type="text" name="title" id="edit_title" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Meta description</label>
+                        <input type="text" name="metaDescription" id="edit_metaDescription" class="form-control">
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label">H1 count</label>
+                            <input type="number" name="h1Count" id="edit_h1Count" class="form-control">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Canonical</label>
+                            <input type="text" name="canonical" id="edit_canonical" class="form-control">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Enregistrer</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block localscript %}
+<script>
+    $(document).ready(function() {
+        $('#crawlPagesTable').DataTable({
+            order: [[0, 'asc']],
+            pageLength: 50,
+            language: { lengthMenu: 'Afficher _MENU_ pages' },
+            columnDefs: [{ targets: 'no-sort', orderable: false }]
+        });
+    });
+
+    function openEditModal(index, pageData) {
+        const form = document.getElementById('editPageForm');
+        form.action = '{{ path("audit_crawl_manage_edit", {id: site.id, index: "__INDEX__"}) }}'.replace('__INDEX__', index);
+
+        document.getElementById('edit_url').value = pageData.url || '';
+        document.getElementById('edit_status').value = pageData.status || 200;
+        document.getElementById('edit_depth').value = pageData.depth || 0;
+        document.getElementById('edit_title').value = pageData.title || '';
+        document.getElementById('edit_metaDescription').value = pageData.metaDescription || '';
+        document.getElementById('edit_h1Count').value = pageData.h1Count || 0;
+        document.getElementById('edit_canonical').value = pageData.canonical || '';
+
+        new bootstrap.Modal(document.getElementById('editPageModal')).show();
+    }
+</script>
+{% endblock %}

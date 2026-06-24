@@ -145,6 +145,6 @@ class StreamCommandController extends AbstractController
 
     private function getPidFile(string $type, int $id): string
     {
-        return sys_get_temp_dir() . "/iargaaseo_{$type}_{$id}.pid";
+        return sys_get_temp_dir() . "/optisight_{$type}_{$id}.pid";
     }
 }

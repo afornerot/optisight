@@ -344,6 +344,8 @@ class Site
                 continue;
             }
 
+            $value = str_replace('\\', '', $value);
+
             switch ($type) {
                 case 'starts_with':
                     if (str_starts_with($pathWithFragment, $value)) {

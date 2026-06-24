@@ -1,4 +1,4 @@
-# IA rgaaseo
+# OptiSight
 
 AI-powered RGAA accessibility and SEO auditing tool. This web application automatically crawls websites, analyzes each page with Lighthouse and pa11y, then uses an LLM (Mistral AI) to generate a synthesis report with actionable recommendations.
 
@@ -41,7 +41,7 @@ AI-powered RGAA accessibility and SEO auditing tool. This web application automa
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd iargaaseo
+cd optisight
 
 # Configure the environment
 cp .env .env.local
@@ -76,7 +76,7 @@ Default values are defined in `.env`. All variables can be overridden by creatin
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DATABASE_URL` | Database connection string | `mysql://user:changeme@mariadb:3306/iargaaseo` |
+| `DATABASE_URL` | Database connection string | `mysql://user:changeme@mariadb:3306/optisight` |
 | `MODE_AUTH` | Authentication mode (`SQL`, `CAS`, `OIDC`) | `SQL` |
 | `CRAWL_MAX_PAGES` | Maximum number of pages to crawl | `500` |
 | `CRAWL_MAX_DEPTH` | Maximum crawl depth | `10` |

@@ -204,6 +204,7 @@
                         <th class="text-center">Perf</th>
                         <th class="text-center">BP</th>
                         <th class="text-center">SEO</th>
+                        <th class="text-center no-sort" style="width:50px;"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -249,6 +250,13 @@
                                     </span>
                                 {% else %}-{% endif %}
                             </td>
+                            <td class="text-center">
+                                <form method="post" action="{{ path('audit_analysis_page_delete', {id: analysis.id, reportId: report.id}) }}" class="d-inline" onsubmit="return confirm('Supprimer cette page ?')">
+                                    <button type="submit" class="btn btn-link btn-sm text-danger p-0" title="Supprimer">
+                                        <i class="fa-solid fa-xmark"></i>
+                                    </button>
+                                </form>
+                            </td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -264,7 +272,8 @@
         $('#reportsTable').DataTable({
             order: [[0, 'asc']],
             pageLength: 100,
-            language: { lengthMenu: 'Afficher _MENU_ pages' }
+            language: { lengthMenu: 'Afficher _MENU_ pages' },
+            columnDefs: [{ targets: 'no-sort', orderable: false }]
         });
     });
 </script>

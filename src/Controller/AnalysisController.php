@@ -274,6 +274,26 @@ class AnalysisController extends AbstractController
         ]);
     }
 
+    #[Route('/{id}/page/{reportId}/delete', name: 'audit_analysis_page_delete', methods: ['POST'])]
+    public function pageDelete(int $id, int $reportId): Response
+    {
+        $analysis = $this->em->getRepository(Analysis::class)->find($id);
+        if (!$analysis) {
+            throw $this->createNotFoundException('Analyse non trouvée');
+        }
+
+        $report = $this->em->getRepository(PageReport::class)->find($reportId);
+        if (!$report || $report->getAnalysis()->getId() !== $id) {
+            throw $this->createNotFoundException('Rapport non trouvé');
+        }
+
+        $this->em->remove($report);
+        $this->em->flush();
+
+        $this->addFlash('success', 'Page supprimée : ' . $report->getUrl());
+        return $this->redirectToRoute('audit_analysis', ['id' => $id]);
+    }
+
     #[Route('/{id}/page/{reportId}/ai', name: 'audit_analysis_page_ai', methods: ['POST'])]
     public function pageAi(int $id, int $reportId): Response
     {

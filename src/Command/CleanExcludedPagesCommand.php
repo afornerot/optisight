@@ -2,8 +2,8 @@
 
 namespace App\Command;
 
+use App\Service\ExcludeCleaner;
 use App\Entity\Analysis;
-use App\Entity\PageReport;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -16,6 +16,7 @@ class CleanExcludedPagesCommand extends Command
 {
     public function __construct(
         private EntityManagerInterface $em,
+        private ExcludeCleaner $cleaner,
     ) {
         parent::__construct();
     }
@@ -36,9 +37,6 @@ class CleanExcludedPagesCommand extends Command
         }
 
         $site = $analysis->getSite();
-        $reports = $this->em->getRepository(PageReport::class)
-            ->findBy(['analysis' => $analysis]);
-
         $excludePatterns = $site->getExcludePatterns();
         if (empty($excludePatterns)) {
             $output->writeln("No exclusion rules configured for this site. Nothing to clean.");
@@ -50,29 +48,12 @@ class CleanExcludedPagesCommand extends Command
         foreach ($excludePatterns as $p) {
             $output->writeln("  - {$p['type']}: {$p['value']}");
         }
-        $output->writeln("Total reports: " . count($reports));
-        $output->writeln("");
 
-        $deleted = 0;
-        $kept = 0;
-
-        foreach ($reports as $report) {
-            if ($site->isUrlExcluded($report->getUrl())) {
-                $output->writeln("EXCLUDED: {$report->getUrl()}");
-                $this->em->remove($report);
-                $deleted++;
-            } else {
-                $kept++;
-            }
-        }
-
-        $this->em->flush();
-
-        $analysis->setPagesCrawled($kept);
-        $this->em->flush();
+        $deleted = $this->cleaner->cleanSite($site);
 
         $output->writeln("");
-        $output->writeln("Done: {$deleted} page(s) supprimée(s), {$kept} page(s) conservée(s).");
+        $output->writeln("Done: {$deleted} page(s) supprimée(s).");
+        $output->writeln("Crawl metadata: " . count($site->getCrawlMetadata() ?? []) . " page(s).");
 
         return Command::SUCCESS;
     }

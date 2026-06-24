@@ -12,12 +12,15 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 
+use App\Service\ExcludeCleaner;
+
 #[Route('/audit')]
 class SiteController extends AbstractController
 {
     public function __construct(
         private EntityManagerInterface $em,
         private AuthService $authService,
+        private ExcludeCleaner $cleaner,
     ) {}
 
     #[Route('', name: 'audit_index')]
@@ -158,6 +161,25 @@ class SiteController extends AbstractController
         $this->em->flush();
 
         $this->addFlash('success', 'Règles d\'exclusion mises à jour.');
+        return $this->redirectToRoute('audit_site', ['id' => $id]);
+    }
+
+    #[Route('/{id}/exclude/clean', name: 'audit_exclude_clean', methods: ['POST'])]
+    public function excludeClean(int $id): Response
+    {
+        $site = $this->em->getRepository(Site::class)->find($id);
+        if (!$site) {
+            throw $this->createNotFoundException('Site non trouvé');
+        }
+
+        if (empty($site->getExcludePatterns())) {
+            $this->addFlash('warning', 'Aucune règle d\'exclusion configurée.');
+            return $this->redirectToRoute('audit_site', ['id' => $id]);
+        }
+
+        $deleted = $this->cleaner->cleanSite($site);
+
+        $this->addFlash('success', "{$deleted} page(s) supprimée(s) selon les règles d'exclusion.");
         return $this->redirectToRoute('audit_site', ['id' => $id]);
     }
 

@@ -36,7 +36,7 @@ if (!loginUrl || !usernameField || !passwordField || !username || !password) {
         });
 
         const page = await browser.newPage();
-        await page.setUserAgent('Mozilla/5.0 (compatible; iargaaseo-auth/1.0)');
+        await page.setUserAgent('Mozilla/5.0 (compatible; optisight-auth/1.0)');
 
         await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 30000 });
 

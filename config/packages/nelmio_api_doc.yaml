@@ -1,7 +1,7 @@
 nelmio_api_doc:
     documentation:
         info:
-            title: iargaaseo API
+            title: OptiSight API
             description: API de consultation des audits RGAA & SEO
             version: '1.0.0'
     areas:
