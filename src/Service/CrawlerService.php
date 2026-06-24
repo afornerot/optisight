@@ -25,14 +25,16 @@ class CrawlerService
     }
 
     /**
-     * Crawl a website starting from rootUrl, discovering all pages.
-     *
-     * @param callable|null $onProgress   function(int $crawled, int $total)
-     * @param callable|null $shouldStop   function(): bool — return true to abort
-     * @param callable|null $onPageFound  function(array $page) — called for each page discovered
-     * @return array<int, array{url: string, status: int, depth: int, title: ?string, metaDescription: ?string, h1Count: int, canonical: ?string, links: string[]}>
+     * @param callable|null $isExcluded   function(string $url): bool — return true if URL should be excluded
      */
-    public function crawl(string $rootUrl, ?callable $onProgress = null, ?callable $shouldStop = null, ?callable $onPageFound = null, ?string $cookieHeader = null): array
+    public function crawl(
+        string $rootUrl,
+        ?callable $onProgress = null,
+        ?callable $shouldStop = null,
+        ?callable $onPageFound = null,
+        ?string $cookieHeader = null,
+        ?callable $isExcluded = null
+    ): array
     {
         $visited = [];
         $pages = [];
@@ -94,7 +96,7 @@ class CrawlerService
                     'metaDescription' => $this->extractMetaDescription($body),
                     'h1Count' => $this->countH1($body),
                     'canonical' => $this->extractCanonical($body),
-                    'links' => $this->extractInternalLinks($body, $baseHost),
+                    'links' => $this->extractInternalLinks($body, $baseHost, $isExcluded),
                 ];
                 $pages[] = $page;
 
@@ -164,7 +166,7 @@ class CrawlerService
         return substr_count(strtolower($html), '<h1');
     }
 
-    private function extractInternalLinks(string $html, string $baseHost): array
+    private function extractInternalLinks(string $html, string $baseHost, ?callable $isExcluded = null): array
     {
         $links = [];
 
@@ -182,10 +184,17 @@ class CrawlerService
                     $href = 'https://' . $baseHost . $href;
                 }
 
+                $fragment = parse_url($href, PHP_URL_FRAGMENT);
+                if ($fragment !== null && $fragment !== '') {
+                    $href = strtok($href, '#');
+                }
+
                 $linkHost = parse_url($href, PHP_URL_HOST);
                 if ($linkHost === $baseHost) {
                     $normalized = rtrim($href, '/');
-                    $links[] = $normalized;
+                    if (!$isExcluded || !$isExcluded($normalized)) {
+                        $links[] = $normalized;
+                    }
                 }
             }
         }

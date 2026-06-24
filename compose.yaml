@@ -21,7 +21,7 @@ services:
     depends_on: 
       - mariadb
     ports:
-      - "8025:80"
+      - "8027:80"
     volumes:
       - ./public/uploads:/app/public/uploads:delegated
       - ./uploads:/app/uploads:delegated
@@ -37,4 +37,4 @@ services:
     container_name: iargaaseo-adminer
     restart: always
     ports:
-      - 6025:8080
+      - 6027:8080

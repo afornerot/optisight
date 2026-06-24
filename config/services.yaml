@@ -42,6 +42,10 @@ services:
     arguments:
       $modeAuth: '%env(MODE_AUTH)%'
 
+  App\Security\ApiKeyAuthenticator:
+    arguments:
+      $appSecret: '%env(APP_SECRET)%'
+
   App\Service\AiService:
     arguments:
       $model: '%env(AI_MODEL)%'

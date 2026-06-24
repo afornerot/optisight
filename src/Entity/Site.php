@@ -334,6 +334,8 @@ class Site
 
         $path = parse_url($url, PHP_URL_PATH) ?? '/';
         $path = rtrim($path, '/');
+        $fragment = parse_url($url, PHP_URL_FRAGMENT);
+        $pathWithFragment = $fragment !== null && $fragment !== '' ? $path . '/#' . $fragment : $path;
 
         foreach ($this->excludePatterns as $pattern) {
             $type = $pattern['type'] ?? '';
@@ -344,22 +346,22 @@ class Site
 
             switch ($type) {
                 case 'starts_with':
-                    if (str_starts_with($path, $value)) {
+                    if (str_starts_with($pathWithFragment, $value)) {
                         return true;
                     }
                     break;
                 case 'contains':
-                    if (str_contains($path, $value)) {
+                    if (str_contains($pathWithFragment, $value)) {
                         return true;
                     }
                     break;
                 case 'ends_with':
-                    if (str_ends_with($path, $value)) {
+                    if (str_ends_with($pathWithFragment, $value)) {
                         return true;
                     }
                     break;
                 case 'equals':
-                    if ($path === $value) {
+                    if ($pathWithFragment === $value) {
                         return true;
                     }
                     break;

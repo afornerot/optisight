@@ -1,0 +1,9 @@
+nelmio_api_doc:
+    documentation:
+        info:
+            title: iargaaseo API
+            description: API de consultation des audits RGAA & SEO
+            version: '1.0.0'
+    areas:
+        path_patterns:
+            - ^/v1/api

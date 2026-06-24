@@ -18,4 +18,5 @@ return [
     Bnine\FilesBundle\BnineFilesBundle::class => ['all' => true],
     Bnine\MdEditorBundle\BnineMdEditorBundle::class => ['all' => true],
     Okvpn\Bundle\CronBundle\OkvpnCronBundle::class => ['all' => true],
+    Nelmio\ApiDocBundle\NelmioApiDocBundle::class => ['all' => true],
 ];

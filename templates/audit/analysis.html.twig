@@ -195,7 +195,7 @@
             <h5 class="card-title mb-0">Détails par page</h5>
         </div>
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
+            <table class="table table-hover mb-0" id="reportsTable">
                 <thead>
                     <tr>
                         <th>URL</th>
@@ -256,4 +256,16 @@
         </div>
     </div>
 {% endif %}
+{% endblock %}
+
+{% block localscript %}
+<script>
+    $(document).ready(function() {
+        $('#reportsTable').DataTable({
+            order: [[0, 'asc']],
+            pageLength: 100,
+            language: { lengthMenu: 'Afficher _MENU_ pages' }
+        });
+    });
+</script>
 {% endblock %}

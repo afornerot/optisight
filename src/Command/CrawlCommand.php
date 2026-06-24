@@ -55,8 +55,15 @@ class CrawlCommand extends Command
         }
 
         $excludePatterns = $site->getExcludePatterns();
+        $excludeCount = !empty($excludePatterns) ? count($excludePatterns) : 0;
+        $output->writeln("EXCLUDE:" . $excludeCount . " règle(s) d'exclusion");
+
+        // Define exclusion check function based on site patterns
+        $isExcluded = null;
         if (!empty($excludePatterns)) {
-            $output->writeln("EXCLUDE:" . count($excludePatterns) . " règle(s) d'exclusion");
+            $isExcluded = function ($url) use ($site) {
+                return $site->isUrlExcluded($url);
+            };
         }
 
         try {
@@ -80,7 +87,8 @@ class CrawlCommand extends Command
                         $output->writeln("FOUND:{$page['status']}:{$page['url']}:{$page['title']}");
                     }
                 },
-                $cookieHeader
+                $cookieHeader,
+                $isExcluded
             );
 
             $pagesCount = count($pages);

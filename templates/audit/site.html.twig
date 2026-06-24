@@ -115,7 +115,7 @@
             <h5 class="mb-0">Analyses</h5>
         </div>
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
+            <table class="table table-hover mb-0" id="analysesTable">
                 <thead>
                     <tr>
                         <th>Date</th>
@@ -214,5 +214,17 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+</script>
+{% endblock %}
+
+{% block localscript %}
+<script>
+    $(document).ready(function() {
+        $('#analysesTable').DataTable({
+            order: [[0, 'desc']],
+            pageLength: 25,
+            language: { lengthMenu: 'Afficher _MENU_ analyses' }
+        });
+    });
 </script>
 {% endblock %}
