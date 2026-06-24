@@ -47,3 +47,7 @@ services:
       $model: '%env(AI_MODEL)%'
       $apiKey: '%env(AI_API_KEY)%'
       $baseUrl: '%env(AI_BASE_URL)%'
+
+  App\Service\AuthService:
+    arguments:
+      $projectDir: '%kernel.project_dir%'

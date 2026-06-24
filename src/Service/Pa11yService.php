@@ -25,10 +25,9 @@ class Pa11yService
      *
      * @return array{score: float, errors: array, warnings: array, raw: mixed}|null
      */
-    public function analyze(string $url): ?array
+    public function analyze(string $url, ?string $cookieHeader = null): ?array
     {
-        $configFile = tempnam(sys_get_temp_dir(), 'pa11y_') . '.json';
-        file_put_contents($configFile, json_encode([
+        $config = [
             'chromeLaunchConfig' => [
                 'executablePath' => '/usr/bin/chromium-browser',
                 'args' => [
@@ -38,7 +37,30 @@ class Pa11yService
                     '--disable-gpu',
                 ],
             ],
-        ]));
+        ];
+
+        if ($cookieHeader !== null) {
+            $cookies = [];
+            $pairs = explode(';', $cookieHeader);
+            foreach ($pairs as $pair) {
+                $pair = trim($pair);
+                $pos = strpos($pair, '=');
+                if ($pos !== false) {
+                    $cookies[] = [
+                        'name' => substr($pair, 0, $pos),
+                        'value' => substr($pair, $pos + 1),
+                        'domain' => parse_url($url, PHP_URL_HOST),
+                        'path' => '/',
+                    ];
+                }
+            }
+            if (!empty($cookies)) {
+                $config['cookies'] = $cookies;
+            }
+        }
+
+        $configFile = tempnam(sys_get_temp_dir(), 'pa11y_') . '.json';
+        file_put_contents($configFile, json_encode($config));
 
         try {
             $process = new Process([

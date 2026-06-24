@@ -29,6 +29,23 @@
                                placeholder="https://example.com">
                         <div class="form-text">L'analyse commencera à cette URL et explorera toutes les pages liées.</div>
                     </div>
+                    <div class="mb-3">
+                        <label for="auth_type" class="form-label">Authentification</label>
+                        <select class="form-select" id="auth_type" name="auth_type">
+                            <option value="" selected>Aucune authentification</option>
+                            <option value="cookie">Cookie de session (copier-coller)</option>
+                            <option value="form">Formulaire automatique (Puppeteer)</option>
+                        </select>
+                        <div class="form-text">Si le site est protégé, sélectionnez un mode et configurez-le après la création.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Exclusions de pages</label>
+                        <div id="exclude-patterns" class="mb-2"></div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addExcludePattern()">
+                            <i class="fa-solid fa-plus"></i> Ajouter une règle
+                        </button>
+                        <div class="form-text">Excluez des pages du crawl et de l'analyse. Les patterns sont appliqués au chemin de l'URL (après le domaine).</div>
+                    </div>
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary">
                             <i class="fa-solid fa-plus"></i> Ajouter
@@ -40,4 +57,33 @@
         </div>
     </div>
 </div>
+
+<script>
+let excludePatternIdx = 0;
+
+function addExcludePattern(type, value) {
+    type = type || 'starts_with';
+    value = value || '';
+    const container = document.getElementById('exclude-patterns');
+    const idx = excludePatternIdx++;
+    const row = document.createElement('div');
+    row.className = 'input-group mb-2';
+    row.innerHTML =
+        '<select class="form-select" name="exclude_type[]" style="max-width:180px;">' +
+            '<option value="starts_with"' + (type === 'starts_with' ? ' selected' : '') + '>Commence par</option>' +
+            '<option value="contains"' + (type === 'contains' ? ' selected' : '') + '>Contient</option>' +
+            '<option value="ends_with"' + (type === 'ends_with' ? ' selected' : '') + '>Finit par</option>' +
+            '<option value="equals"' + (type === 'equals' ? ' selected' : '') + '= Égal à</option>' +
+        '</select>' +
+        '<input type="text" class="form-control" name="exclude_value[]" placeholder="/admin, /api, .pdf" value="' + escHtml(value) + '">' +
+        '<button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()"><i class="fa-solid fa-xmark"></i></button>';
+    container.appendChild(row);
+}
+
+function escHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+</script>
 {% endblock %}

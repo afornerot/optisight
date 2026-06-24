@@ -62,6 +62,8 @@ class RgaaCommand extends Command
         $output->writeln("PAGES:" . count($crawlMetadata));
         $output->writeln("STEP:Analyse en cours...");
 
+        $cookieHeader = $site->getCookieHeader();
+
         try {
             $total = count($crawlMetadata);
 
@@ -88,7 +90,7 @@ class RgaaCommand extends Command
                     'depth' => $page['depth'] ?? null,
                 ]);
 
-                $lhResult = $this->lighthouse->analyze($page['url']);
+                $lhResult = $this->lighthouse->analyze($page['url'], $cookieHeader);
                 if ($lhResult) {
                     $report->setLhPerformance($lhResult['performance']);
                     $report->setLhAccessibility($lhResult['accessibility']);
@@ -100,7 +102,7 @@ class RgaaCommand extends Command
                     $output->writeln("LH:NONE");
                 }
 
-                $paResult = $this->pa11y->analyze($page['url']);
+                $paResult = $this->pa11y->analyze($page['url'], $cookieHeader);
                 if ($paResult) {
                     $errors = count($paResult['errors']);
                     $warnings = count($paResult['warnings']);

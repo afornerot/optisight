@@ -19,15 +19,26 @@ class LighthouseService
      *
      * @return array{performance: float, accessibility: float, seo: float, bestPractices: float, raw: mixed}|null
      */
-    public function analyze(string $url): ?array
+    public function analyze(string $url, ?string $cookieHeader = null): ?array
     {
-        $process = new Process([
+        $args = [
             'lighthouse', $url,
             '--output=json',
             '--quiet',
             '--chrome-flags=--headless --no-sandbox --disable-gpu --disable-dev-shm-usage',
             '--only-categories=performance,accessibility,seo,best-practices',
-        ]);
+        ];
+
+        $extraHeadersFile = null;
+        if ($cookieHeader !== null) {
+            $extraHeadersFile = tempnam(sys_get_temp_dir(), 'lh_headers_') . '.json';
+            file_put_contents($extraHeadersFile, json_encode([
+                'Cookie' => $cookieHeader,
+            ]));
+            $args[] = '--extra-headers=' . $extraHeadersFile;
+        }
+
+        $process = new Process($args);
         $process->setTimeout(120);
         $process->setEnv(array_merge($_ENV, [
             'PATH' => $this->getBinPath(),
@@ -58,6 +69,10 @@ class LighthouseService
         } catch (\Exception $e) {
             $this->logger->error('Lighthouse exception for: ' . $url, ['error' => $e->getMessage()]);
             return null;
+        } finally {
+            if ($extraHeadersFile !== null && file_exists($extraHeadersFile)) {
+                @unlink($extraHeadersFile);
+            }
         }
     }
 

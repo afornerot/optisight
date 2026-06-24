@@ -8,11 +8,13 @@ RUN ln -sf /usr/share/zoneinfo/Europe/Paris /etc/localtime && echo "Europe/Paris
 RUN echo "* * * * * /app/bin/console okvpn:cron --env=prod" >> /var/spool/cron/crontabs/apache
 RUN chown apache:apache /var/spool/cron/crontabs/apache
 
-# Node.js + Lighthouse + pa11y
+# Node.js + Lighthouse + pa11y + Puppeteer
 RUN apk add --no-cache nodejs npm chromium \
-    && npm install -g lighthouse pa11y \
+    && npm install -g lighthouse pa11y puppeteer-core \
     && npm cache clean --force \
     && apk del --no-cache npm
+
+ENV NODE_PATH=/usr/local/lib/node_modules
 
 COPY ./misc/docker/apache.conf /etc/apache2/conf.d/nine/site.conf
 

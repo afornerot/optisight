@@ -13,43 +13,129 @@
 </nav>
 
 <div class="mb-4">
-    <h1 class="h3 mb-1 text-break">{{ report.url }}</h1>
-    <span class="text-muted">HTTP {{ report.httpStatus }} &middot; le {{ report.createdAt|date('d/m/Y à H:i') }}</span>
+    <h1 class="h3 mb-1 text-break d-inline">{{ report.url }}</h1>
+    <a href="{{ report.url }}" target="_blank" rel="noopener" class="btn btn-outline-secondary btn-sm ms-2" title="Ouvrir dans un nouvel onglet">
+        <i class="fa-solid fa-up-right-from-square"></i>
+    </a>
+    <div class="text-muted">HTTP {{ report.httpStatus }} &middot; le {{ report.createdAt|date('d/m/Y à H:i') }}</div>
 </div>
 
-<div class="row g-4">
+<div class="row g-4" style="overflow-x: hidden;">
 
     {# Scores #}
     <div class="col-12">
         <div class="card">
-            <div class="card-header"><h5 class="mb-0">Scores</h5></div>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Scores</h5>
+                <button type="button" class="btn btn-outline-warning btn-sm" onclick="launchReanalyze()" id="reanalyze-btn">
+                    <i class="fa-solid fa-rotate"></i> Relancer Lighthouse + pa11y
+                </button>
+            </div>
             <div class="card-body">
-                <div class="row text-center g-3">
-                    <div class="col-6 col-md-3">
-                        <div class="display-6 fw-bold {{ (report.lhPerformance ?? 0) >= 90 ? 'text-success' : (report.lhPerformance ?? 0) >= 50 ? 'text-warning' : 'text-danger' }}">
-                            {{ report.lhPerformance is not null ? report.lhPerformance|round : '-' }}
-                        </div>
-                        <div class="text-muted">Performance</div>
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <div class="display-6 fw-bold {{ (report.lhAccessibility ?? 0) >= 90 ? 'text-success' : (report.lhAccessibility ?? 0) >= 50 ? 'text-warning' : 'text-danger' }}">
-                            {{ report.lhAccessibility is not null ? report.lhAccessibility|round : '-' }}
-                        </div>
-                        <div class="text-muted">Accessibilité</div>
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <div class="display-6 fw-bold {{ (report.lhSeo ?? 0) >= 90 ? 'text-success' : (report.lhSeo ?? 0) >= 50 ? 'text-warning' : 'text-danger' }}">
-                            {{ report.lhSeo is not null ? report.lhSeo|round : '-' }}
-                        </div>
-                        <div class="text-muted">SEO</div>
-                    </div>
-                    <div class="col-6 col-md-3">
+                <div id="reanalyze-console" class="d-none mb-3 p-3 text-white bg-dark" style="border-radius: 0.375rem; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.85em; white-space: pre-wrap;"></div>
+                <div class="row g-3 text-center">
+                    <div class="col">
                         <div class="display-6 fw-bold {{ (report.rgaaScore ?? 0) >= 90 ? 'text-success' : (report.rgaaScore ?? 0) >= 50 ? 'text-warning' : 'text-danger' }}">
                             {{ report.rgaaScore is not null ? report.rgaaScore|round : '-' }}
                         </div>
-                        <div class="text-muted">RGAA</div>
+                        <div class="text-muted small">RGAA</div>
+                    </div>
+                    <div class="col">
+                        <div class="display-6 fw-bold {{ (report.lhAccessibility ?? 0) >= 90 ? 'text-success' : (report.lhAccessibility ?? 0) >= 50 ? 'text-warning' : 'text-danger' }}">
+                            {{ report.lhAccessibility is not null ? report.lhAccessibility|round : '-' }}
+                        </div>
+                        <div class="text-muted small">A11y</div>
+                    </div>
+                    <div class="col">
+                        <div class="display-6 fw-bold {{ (report.lhPerformance ?? 0) >= 90 ? 'text-success' : (report.lhPerformance ?? 0) >= 50 ? 'text-warning' : 'text-danger' }}">
+                            {{ report.lhPerformance is not null ? report.lhPerformance|round : '-' }}
+                        </div>
+                        <div class="text-muted small">Perf</div>
+                    </div>
+                    <div class="col">
+                        <div class="display-6 fw-bold {{ (report.lhBestPractices ?? 0) >= 90 ? 'text-success' : (report.lhBestPractices ?? 0) >= 50 ? 'text-warning' : 'text-danger' }}">
+                            {{ report.lhBestPractices is not null ? report.lhBestPractices|round : '-' }}
+                        </div>
+                        <div class="text-muted small">BP</div>
+                    </div>
+                    <div class="col">
+                        <div class="display-6 fw-bold {{ (report.lhSeo ?? 0) >= 90 ? 'text-success' : (report.lhSeo ?? 0) >= 50 ? 'text-warning' : 'text-danger' }}">
+                            {{ report.lhSeo is not null ? report.lhSeo|round : '-' }}
+                        </div>
+                        <div class="text-muted small">SEO</div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    {# AI Analysis #}
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-0"><i class="fa-solid fa-robot"></i> Analyse IA de cette page</h5>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" onclick="launchAiAnalysis()" id="ai-launch-btn">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> {{ report.aiAnalysis is not empty and report.aiAnalysis is not null ? 'Relancer l\'analyse IA' : 'Lancer l\'analyse IA' }}
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="ai-console" class="d-none mb-3 p-3 text-white bg-dark" style="border-radius: 0.375rem; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.85em; white-space: pre-wrap;"></div>
+
+                {% if report.aiAnalysis is not empty and report.aiAnalysis is not null %}
+                    <small class="text-muted d-block mb-3">Analysée le {{ report.aiAnalysisAt|date('d/m/Y à H:i') }}</small>
+
+                    {% set indicators = ['rgaa', 'accessibilite', 'performance', 'bonnes_pratiques', 'seo'] %}
+                    {% set indLabels = {'performance': 'Performance', 'accessibilite': 'Accessibilité', 'seo': 'SEO', 'bonnes_pratiques': 'Bonnes Pratiques', 'rgaa': 'RGAA'} %}
+                    {% set indIcons = {'performance': 'fa-bolt', 'accessibilite': 'fa-universal-access', 'seo': 'fa-magnifying-glass', 'bonnes_pratiques': 'fa-check-circle', 'rgaa': 'fa-universal-access'} %}
+                    {% set indColors = {'performance': 'primary', 'accessibilite': 'success', 'seo': 'info', 'bonnes_pratiques': 'warning', 'rgaa': 'danger'} %}
+
+                    <div class="row g-3">
+                        {% for ind in indicators %}
+                            {% set data = report.aiAnalysis[ind] ?? null %}
+                            <div class="col">
+                                <div class="card h-100 border-top border-3 border-{{ indColors[ind] }}">
+                                    <div class="card-header bg-{{ indColors[ind] }} bg-opacity-10 py-2">
+                                        <h6 class="mb-0 text-{{ indColors[ind] }}">
+                                            <i class="fa-solid {{ indIcons[ind] }}"></i> {{ indLabels[ind] }}
+                                        </h6>
+                                    </div>
+                                    <div class="card-body p-2" style="font-size: 0.88em;">
+                                        {% if data and data.summary is not empty %}
+                                            <p class="mb-2">{{ data.summary }}</p>
+                                            {% if data.recommendations is defined and data.recommendations is not empty %}
+                                                {% set priorityColors = {'HIGH': 'danger', 'MEDIUM': 'warning', 'LOW': 'info'} %}
+                                                {% for rec in data.recommendations %}
+                                                    <div class="mb-2 p-2 rounded border border-secondary">
+                                                        <div class="d-flex align-items-center gap-1 mb-1">
+                                                            <span class="badge bg-{{ priorityColors[rec.priority] ?? 'secondary' }}" style="font-size:0.7em;">{{ rec.priority }}</span>
+                                                            <strong style="font-size:0.85em;">{{ rec.title }}</strong>
+                                                        </div>
+                                                        {% if rec.elements is defined and rec.elements is not empty %}
+                                                            <ul class="list-unstyled mb-1 ms-2">
+                                                                {% for el in rec.elements %}
+                                                                    <li><code class="text-break" style="font-size:0.78em;">{{ el }}</code></li>
+                                                                {% endfor %}
+                                                            </ul>
+                                                        {% endif %}
+                                                        {% if rec.details %}
+                                                            <p class="mb-0 text-muted small" style="white-space: pre-line;">{{ rec.details }}</p>
+                                                        {% endif %}
+                                                    </div>
+                                                {% endfor %}
+                                            {% endif %}
+                                        {% else %}
+                                            <p class="text-muted mb-0 text-center" style="font-size:0.85em;">Aucune donnée</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0" id="ai-empty-msg">Aucune analyse IA disponible pour cette page. Cliquez sur le bouton ci-dessus pour obtenir des recommandations détaillées et ciblées.</p>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -142,13 +228,15 @@
                     {% endif %}
                 </h5>
             </div>
-                    <div class="card-body">
-                        {% if report.lighthouseReport is not empty %}
-                            <pre class="mb-0" style="max-height:400px; overflow:auto; font-size:0.8em; white-space:pre; word-wrap:normal;"><code>{{ report.lighthouseReport|json_pretty|e }}</code></pre>
-                        {% else %}
-                            <p class="text-muted mb-0">Aucun rapport Lighthouse disponible.</p>
-                        {% endif %}
+            <div class="card-body p-0">
+                {% if report.lighthouseReport is not empty %}
+                    <div class="p-3" style="max-height:400px; overflow:auto;">
+                        <pre class="mb-0" style="font-size:0.8em; white-space:pre-wrap; word-wrap:break-word; overflow-wrap:anywhere;"><code>{{ report.lighthouseReport|json_pretty|e }}</code></pre>
                     </div>
+                {% else %}
+                    <p class="text-muted mb-0">Aucun rapport Lighthouse disponible.</p>
+                {% endif %}
+            </div>
         </div>
     </div>
 
@@ -162,9 +250,11 @@
                     {% endif %}
                 </h5>
             </div>
-            <div class="card-body">
+            <div class="card-body p-0">
                 {% if report.pa11yReport is not empty %}
-                    <pre class="mb-0" style="max-height:400px; overflow:auto; font-size:0.8em; white-space:pre; word-wrap:normal;"><code>{{ report.pa11yReport|json_pretty|e }}</code></pre>
+                    <div class="p-3" style="max-height:400px; overflow:auto;">
+                        <pre class="mb-0" style="font-size:0.8em; white-space:pre-wrap; word-wrap:break-word; overflow-wrap:anywhere;"><code>{{ report.pa11yReport|json_pretty|e }}</code></pre>
+                    </div>
                 {% else %}
                     <p class="text-muted mb-0">Aucun rapport pa11y disponible.</p>
                 {% endif %}
@@ -173,4 +263,186 @@
     </div>
 
 </div>
+{% endblock %}
+
+{% block javascripts %}
+<script>
+function launchAiAnalysis() {
+    const consoleEl = document.getElementById('ai-console');
+    const btn = document.getElementById('ai-launch-btn');
+
+    consoleEl.classList.remove('d-none');
+    consoleEl.innerHTML = '';
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Analyse en cours...';
+
+    function esc(str) {
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    function parseLine(line) {
+        if (line.startsWith('STEP:')) {
+            return '<div class="text-warning"><span class="spinner-border spinner-border-sm"></span> ' + esc(line.substring(5)) + '</div>';
+        }
+        if (line.startsWith('DONE_LH:')) {
+            return '<div class="text-info fw-bold"><i class="fa-solid fa-check-circle"></i> Lighthouse : ' + esc(line.substring(8)) + '</div>';
+        }
+        if (line.startsWith('DONE_RGAA:')) {
+            return '<div class="text-info fw-bold"><i class="fa-solid fa-check-circle"></i> pa11y : ' + esc(line.substring(10)) + '</div>';
+        }
+        if (line.startsWith('DONE:')) {
+            return '<div class="text-success fw-bold"><i class="fa-solid fa-check-circle"></i> ' + esc(line.substring(5)) + '</div>';
+        }
+        if (line.startsWith('ERROR_LH:')) {
+            return '<div class="text-danger fw-bold"><i class="fa-solid fa-xmark-circle"></i> Lighthouse : ' + esc(line.substring(9)) + '</div>';
+        }
+        if (line.startsWith('ERROR_RGAA:')) {
+            return '<div class="text-danger fw-bold"><i class="fa-solid fa-xmark-circle"></i> pa11y : ' + esc(line.substring(11)) + '</div>';
+        }
+        if (line.startsWith('ERROR:')) {
+            return '<div class="text-danger fw-bold"><i class="fa-solid fa-xmark-circle"></i> ' + esc(line.substring(6)) + '</div>';
+        }
+        return '<div>' + esc(line) + '</div>';
+    }
+
+    (async function() {
+        try {
+            const response = await fetch('{{ path("audit_analysis_page_ai", {id: analysis.id, reportId: report.id}) }}', {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            if (!response.ok) {
+                consoleEl.innerHTML += '<div class="text-danger">Erreur HTTP ' + response.status + '</div>';
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Relancer l\'analyse IA';
+                return;
+            }
+            if (!response.body) {
+                consoleEl.innerHTML += '<div class="text-danger">Streaming non supporté.</div>';
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Relancer l\'analyse IA';
+                return;
+            }
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+                for (const line of lines) {
+                    if (line.trim()) {
+                        consoleEl.innerHTML += parseLine(line);
+                        consoleEl.scrollTop = consoleEl.scrollHeight;
+                    }
+                }
+            }
+            if (buffer.trim()) {
+                consoleEl.innerHTML += parseLine(buffer);
+                consoleEl.scrollTop = consoleEl.scrollHeight;
+            }
+
+            setTimeout(() => { location.reload(); }, 1000);
+        } catch (error) {
+            consoleEl.innerHTML += '<div class="text-danger fw-bold">Erreur : ' + esc(error.message) + '</div>';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Relancer l\'analyse IA';
+        }
+    })();
+}
+
+function launchReanalyze() {
+    const consoleEl = document.getElementById('reanalyze-console');
+    const btn = document.getElementById('reanalyze-btn');
+
+    consoleEl.classList.remove('d-none');
+    consoleEl.innerHTML = '';
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Analyse en cours...';
+
+    function esc(str) {
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    function parseLine(line) {
+        if (line.startsWith('STEP:')) {
+            return '<div class="text-warning"><span class="spinner-border spinner-border-sm"></span> ' + esc(line.substring(5)) + '</div>';
+        }
+        if (line.startsWith('DONE_LH:')) {
+            return '<div class="text-info fw-bold"><i class="fa-solid fa-check-circle"></i> Lighthouse : ' + esc(line.substring(8)) + '</div>';
+        }
+        if (line.startsWith('DONE_RGAA:')) {
+            return '<div class="text-info fw-bold"><i class="fa-solid fa-check-circle"></i> pa11y : ' + esc(line.substring(10)) + '</div>';
+        }
+        if (line.startsWith('DONE:')) {
+            return '<div class="text-success fw-bold"><i class="fa-solid fa-check-circle"></i> ' + esc(line.substring(5)) + '</div>';
+        }
+        if (line.startsWith('ERROR_LH:')) {
+            return '<div class="text-danger fw-bold"><i class="fa-solid fa-xmark-circle"></i> Lighthouse : ' + esc(line.substring(9)) + '</div>';
+        }
+        if (line.startsWith('ERROR_RGAA:')) {
+            return '<div class="text-danger fw-bold"><i class="fa-solid fa-xmark-circle"></i> pa11y : ' + esc(line.substring(11)) + '</div>';
+        }
+        if (line.startsWith('ERROR:')) {
+            return '<div class="text-danger fw-bold"><i class="fa-solid fa-xmark-circle"></i> ' + esc(line.substring(6)) + '</div>';
+        }
+        return '<div>' + esc(line) + '</div>';
+    }
+
+    (async function() {
+        try {
+            const response = await fetch('{{ path("audit_analysis_page_reanalyze", {id: analysis.id, reportId: report.id}) }}', {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            if (!response.ok) {
+                consoleEl.innerHTML += '<div class="text-danger">Erreur HTTP ' + response.status + '</div>';
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Relancer Lighthouse + pa11y';
+                return;
+            }
+            if (!response.body) {
+                consoleEl.innerHTML += '<div class="text-danger">Streaming non supporté.</div>';
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Relancer Lighthouse + pa11y';
+                return;
+            }
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+                for (const line of lines) {
+                    if (line.trim()) {
+                        consoleEl.innerHTML += parseLine(line);
+                        consoleEl.scrollTop = consoleEl.scrollHeight;
+                    }
+                }
+            }
+            if (buffer.trim()) {
+                consoleEl.innerHTML += parseLine(buffer);
+                consoleEl.scrollTop = consoleEl.scrollHeight;
+            }
+
+            setTimeout(() => { location.reload(); }, 1000);
+        } catch (error) {
+            consoleEl.innerHTML += '<div class="text-danger fw-bold">Erreur : ' + esc(error.message) + '</div>';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Relancer Lighthouse + pa11y';
+        }
+    })();
+}
+</script>
 {% endblock %}

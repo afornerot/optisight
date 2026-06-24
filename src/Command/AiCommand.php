@@ -133,23 +133,58 @@ class AiCommand extends Command
                 'pa11y_issues_aggregated' => $pa11yIssueAgg,
             ];
 
-            $output->writeln("STEP:Analyse en cours...");
+            $output->writeln("STEP:Analyse en cours (5 indicateurs)...");
 
-            $aiResult = $this->ai->synthesizeReport($pagesData);
+            $allResults = [];
+            $indicators = \App\Service\AiService::INDICATORS;
+            $labels = \App\Service\AiService::INDICATOR_LABELS;
 
-            if ($aiResult) {
+            foreach ($indicators as $idx => $indicator) {
+                $num = $idx + 1;
+                $label = $labels[$indicator];
+                $output->writeln("STEP:({$num}/5) Analyse {$label}...");
+
+                $aiResult = $this->ai->synthesizeReportByIndicator($pagesData, $indicator);
+
+                if ($aiResult) {
+                    $allResults[$indicator] = $aiResult;
+                    $output->writeln("DONE_" . strtoupper($indicator) . ":OK");
+                } else {
+                    $allResults[$indicator] = ['summary' => '', 'recommendations' => []];
+                    $output->writeln("DONE_" . strtoupper($indicator) . ":EMPTY");
+                }
+
+                if ($idx < count($indicators) - 1) {
+                    usleep(1500000);
+                }
+            }
+
+            if (!empty(array_filter($allResults, fn($r) => !empty($r['summary']) || !empty($r['recommendations'])))) {
                 $summary = new AiSummary();
                 $summary->setAnalysis($analysis);
-                $summary->setSummary($aiResult['summary'] ?? '');
-                $summary->setRecommendations($aiResult['recommendations'] ?? []);
+
+                $globalSummary = '';
+                $allRecommendations = [];
+                foreach ($allResults as $indicator => $r) {
+                    if (!empty($r['summary'])) {
+                        $label = $labels[$indicator];
+                        $globalSummary .= "**{$label}** : " . $r['summary'] . "\n\n";
+                    }
+                    if (!empty($r['recommendations'])) {
+                        $allRecommendations = array_merge($allRecommendations, $r['recommendations']);
+                    }
+                }
+
+                $summary->setSummary(trim($globalSummary));
+                $summary->setRecommendations($allRecommendations);
+                $summary->setSummaryJson($allResults);
                 $this->em->persist($summary);
                 $this->em->flush();
 
-                $summaryText = is_string($aiResult['summary']) ? $aiResult['summary'] : $this->normalizeToText($aiResult['summary'] ?? '');
-                $output->writeln("SUMMARY:{$summaryText}");
+                $output->writeln("SUMMARY:" . trim($globalSummary));
 
-                if (!empty($aiResult['recommendations'])) {
-                    foreach ($aiResult['recommendations'] as $rec) {
+                if (!empty($allRecommendations)) {
+                    foreach ($allRecommendations as $rec) {
                         $priority = $rec['priority'] ?? 'LOW';
                         $category = $rec['category'] ?? '';
                         $title = $rec['title'] ?? '';
@@ -160,9 +195,9 @@ class AiCommand extends Command
                     }
                 }
 
-                $output->writeln("DONE:Synthèse IA terminée.");
+                $output->writeln("DONE:Synthèse IA terminée (5 indicateurs).");
             } else {
-                $output->writeln("WARN:La synthèse IA n'a pas retourné de résultat (clé API non configurée ?).");
+                $output->writeln("WARN:Aucun résultat IA obtenu (clé API non configurée ?).");
             }
         } catch (\Exception $e) {
             $output->writeln("ERROR:Échec de la synthèse IA : {$e->getMessage()}");

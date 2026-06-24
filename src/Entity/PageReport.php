@@ -74,6 +74,12 @@ class PageReport
     #[ORM\Column(type: Types::JSON, nullable: true)]
     private ?array $crawlMetadata = [];
 
+    #[ORM\Column(type: Types::JSON, nullable: true)]
+    private ?array $aiAnalysis = null;
+
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $aiAnalysisAt = null;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private ?\DateTimeImmutable $createdAt = null;
 
@@ -282,6 +288,28 @@ class PageReport
     public function setCrawlMetadata(?array $crawlMetadata): static
     {
         $this->crawlMetadata = $crawlMetadata;
+        return $this;
+    }
+
+    public function getAiAnalysis(): ?array
+    {
+        return $this->aiAnalysis;
+    }
+
+    public function setAiAnalysis(?array $aiAnalysis): static
+    {
+        $this->aiAnalysis = $aiAnalysis;
+        return $this;
+    }
+
+    public function getAiAnalysisAt(): ?\DateTimeImmutable
+    {
+        return $this->aiAnalysisAt;
+    }
+
+    public function setAiAnalysisAt(?\DateTimeImmutable $aiAnalysisAt): static
+    {
+        $this->aiAnalysisAt = $aiAnalysisAt;
         return $this;
     }
 

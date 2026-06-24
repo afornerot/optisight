@@ -25,6 +25,9 @@ class AiSummary
     #[ORM\Column(type: Types::JSON, nullable: true)]
     private ?array $recommendations = [];
 
+    #[ORM\Column(type: Types::JSON, nullable: true)]
+    private ?array $summaryJson = [];
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private ?\DateTimeImmutable $createdAt = null;
 
@@ -68,6 +71,17 @@ class AiSummary
     public function setRecommendations(?array $recommendations): static
     {
         $this->recommendations = $recommendations;
+        return $this;
+    }
+
+    public function getSummaryJson(): ?array
+    {
+        return $this->summaryJson;
+    }
+
+    public function setSummaryJson(?array $summaryJson): static
+    {
+        $this->summaryJson = $summaryJson;
         return $this;
     }
 

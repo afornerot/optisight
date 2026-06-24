@@ -32,7 +32,7 @@ class CrawlerService
      * @param callable|null $onPageFound  function(array $page) — called for each page discovered
      * @return array<int, array{url: string, status: int, depth: int, title: ?string, metaDescription: ?string, h1Count: int, canonical: ?string, links: string[]}>
      */
-    public function crawl(string $rootUrl, ?callable $onProgress = null, ?callable $shouldStop = null, ?callable $onPageFound = null): array
+    public function crawl(string $rootUrl, ?callable $onProgress = null, ?callable $shouldStop = null, ?callable $onPageFound = null, ?string $cookieHeader = null): array
     {
         $visited = [];
         $pages = [];
@@ -57,12 +57,17 @@ class CrawlerService
 
             $statusCode = null;
             try {
+                $headers = [
+                    'User-Agent' => ($_ENV['CRAWL_USER_AGENT'] ?? 'iargaaseo-bot/1.0'),
+                ];
+                if ($cookieHeader !== null) {
+                    $headers['Cookie'] = $cookieHeader;
+                }
+
                 $response = $this->http->request('GET', $url, [
                     'timeout' => 10,
                     'max_redirects' => 5,
-                    'headers' => [
-                        'User-Agent' => ($_ENV['CRAWL_USER_AGENT'] ?? 'iargaaseo-bot/1.0'),
-                    ],
+                    'headers' => $headers,
                 ]);
 
                 $statusCode = $response->getStatusCode();

@@ -43,51 +43,42 @@
     {% set avgPerf = 0 %}
     {% set avgA11y = 0 %}
     {% set avgSeo = 0 %}
+    {% set avgBp = 0 %}
     {% set avgRgaa = 0 %}
     {% set count = reports|length %}
     {% for r in reports %}
         {% set avgPerf = avgPerf + (r.lhPerformance ?? 0) %}
         {% set avgA11y = avgA11y + (r.lhAccessibility ?? 0) %}
         {% set avgSeo = avgSeo + (r.lhSeo ?? 0) %}
+        {% set avgBp = avgBp + (r.lhBestPractices ?? 0) %}
         {% set avgRgaa = avgRgaa + (r.rgaaScore ?? 0) %}
     {% endfor %}
     {% set avgPerf = count > 0 ? (avgPerf / count)|round : 0 %}
     {% set avgA11y = count > 0 ? (avgA11y / count)|round : 0 %}
     {% set avgSeo = count > 0 ? (avgSeo / count)|round : 0 %}
+    {% set avgBp = count > 0 ? (avgBp / count)|round : 0 %}
     {% set avgRgaa = count > 0 ? (avgRgaa / count)|round : 0 %}
 
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <div class="display-6 fw-bold {{ avgPerf >= 90 ? 'text-success' : avgPerf >= 50 ? 'text-warning' : 'text-danger' }}">{{ avgPerf }}</div>
-                    <div class="text-muted">Performance</div>
-                </div>
-            </div>
+    <div class="row g-3 text-center mb-4">
+        <div class="col">
+            <div class="display-6 fw-bold {{ avgRgaa >= 90 ? 'text-success' : avgRgaa >= 50 ? 'text-warning' : 'text-danger' }}">{{ avgRgaa }}</div>
+            <div class="text-muted small">RGAA</div>
         </div>
-        <div class="col-6 col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <div class="display-6 fw-bold {{ avgA11y >= 90 ? 'text-success' : avgA11y >= 50 ? 'text-warning' : 'text-danger' }}">{{ avgA11y }}</div>
-                    <div class="text-muted">Accessibilité</div>
-                </div>
-            </div>
+        <div class="col">
+            <div class="display-6 fw-bold {{ avgA11y >= 90 ? 'text-success' : avgA11y >= 50 ? 'text-warning' : 'text-danger' }}">{{ avgA11y }}</div>
+            <div class="text-muted small">A11y</div>
         </div>
-        <div class="col-6 col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <div class="display-6 fw-bold {{ avgSeo >= 90 ? 'text-success' : avgSeo >= 50 ? 'text-warning' : 'text-danger' }}">{{ avgSeo }}</div>
-                    <div class="text-muted">SEO</div>
-                </div>
-            </div>
+        <div class="col">
+            <div class="display-6 fw-bold {{ avgPerf >= 90 ? 'text-success' : avgPerf >= 50 ? 'text-warning' : 'text-danger' }}">{{ avgPerf }}</div>
+            <div class="text-muted small">Perf</div>
         </div>
-        <div class="col-6 col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <div class="display-6 fw-bold {{ avgRgaa >= 90 ? 'text-success' : avgRgaa >= 50 ? 'text-warning' : 'text-danger' }}">{{ avgRgaa }}</div>
-                    <div class="text-muted">RGAA</div>
-                </div>
-            </div>
+        <div class="col">
+            <div class="display-6 fw-bold {{ avgBp >= 90 ? 'text-success' : avgBp >= 50 ? 'text-warning' : 'text-danger' }}">{{ avgBp }}</div>
+            <div class="text-muted small">BP</div>
+        </div>
+        <div class="col">
+            <div class="display-6 fw-bold {{ avgSeo >= 90 ? 'text-success' : avgSeo >= 50 ? 'text-warning' : 'text-danger' }}">{{ avgSeo }}</div>
+            <div class="text-muted small">SEO</div>
         </div>
     </div>
 {% endif %}
@@ -95,34 +86,94 @@
 {% if summary %}
     <div class="card mb-4">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="card-title mb-0"><i class="fa-solid fa-robot"></i> Résumé IA</h5>
+            <h5 class="card-title mb-0"><i class="fa-solid fa-robot"></i> Synthèse IA</h5>
             <a href="{{ path('audit_analysis_ai', {id: analysis.id}) }}" class="btn btn-outline-success btn-sm">
                 <i class="fa-solid fa-rotate"></i> Relancer l'IA
             </a>
         </div>
         <div class="card-body">
-            <p style="white-space:pre-wrap;">{{ summary.summary }}</p>
-            {% if summary.recommendations is not empty %}
-                <h6 class="mt-3">Recommandations</h6>
-                {% for rec in summary.recommendations %}
-                    {% set borderColors = { 'HIGH': 'danger', 'MEDIUM': 'warning', 'LOW': 'primary' } %}
-                    <div class="border-start border-4 border-{{ borderColors[rec.priority] ?? 'secondary' }} p-3 mb-2 rounded">
-                        <div class="d-flex align-items-center gap-2 mb-1">
-                            <span class="badge bg-{{ borderColors[rec.priority] ?? 'secondary' }}">{{ rec.priority }}</span>
-                            <span class="badge bg-secondary">{{ rec.category }}</span>
-                            <strong class="text-light">{{ rec.title }}</strong>
-                        </div>
-                        {% if rec.pages is defined and rec.pages is not empty %}
-                            <div class="mb-1">
-                                <small class="text-muted">Pages concernées :</small>
-                                {% for page in rec.pages %}
-                                    <code class="text-warning small">{{ page }}</code>{% if not loop.last %} {% endif %}
-                                {% endfor %}
+            {% set indicators = ['rgaa', 'accessibilite', 'performance', 'bonnes_pratiques', 'seo'] %}
+            {% set indLabels = {'performance': 'Performance', 'accessibilite': 'Accessibilité', 'seo': 'SEO', 'bonnes_pratiques': 'Bonnes Pratiques', 'rgaa': 'RGAA'} %}
+            {% set indIcons = {'performance': 'fa-bolt', 'accessibilite': 'fa-universal-access', 'seo': 'fa-magnifying-glass', 'bonnes_pratiques': 'fa-check-circle', 'rgaa': 'fa-universal-access'} %}
+            {% set indColors = {'performance': 'primary', 'accessibilite': 'success', 'seo': 'info', 'bonnes_pratiques': 'warning', 'rgaa': 'danger'} %}
+
+            {% set hasIndicatorData = false %}
+            {% for ind in indicators %}
+                {% set data = summary.summaryJson[ind] ?? null %}
+                {% if data and (data.summary is not empty or (data.recommendations is defined and data.recommendations is not empty)) %}
+                    {% set hasIndicatorData = true %}
+                {% endif %}
+            {% endfor %}
+
+            {% if hasIndicatorData %}
+                <div class="row g-3">
+                    {% for ind in indicators %}
+                        {% set data = summary.summaryJson[ind] ?? null %}
+                        <div class="col">
+                            <div class="card h-100 border-top border-3 border-{{ indColors[ind] }}">
+                                <div class="card-header bg-{{ indColors[ind] }} bg-opacity-10 py-2">
+                                    <h6 class="mb-0 text-{{ indColors[ind] }}">
+                                        <i class="fa-solid {{ indIcons[ind] }}"></i> {{ indLabels[ind] }}
+                                    </h6>
+                                </div>
+                                    <div class="card-body p-2" style="font-size: 0.88em;">
+                                        {% if data and data.summary is not empty %}
+                                            <p class="mb-2">{{ data.summary }}</p>
+                                        {% if data.recommendations is defined and data.recommendations is not empty %}
+                                            {% set priorityColors = {'HIGH': 'danger', 'MEDIUM': 'warning', 'LOW': 'info'} %}
+                                            {% for rec in data.recommendations %}
+                                                <div class="mb-2 p-2 rounded border border-secondary">
+                                                    <div class="d-flex align-items-center gap-1 mb-1">
+                                                        <span class="badge bg-{{ priorityColors[rec.priority] ?? 'secondary' }}" style="font-size:0.7em;">{{ rec.priority }}</span>
+                                                        <strong style="font-size:0.85em;">{{ rec.title }}</strong>
+                                                    </div>
+                                                    {% if rec.pages is defined and rec.pages is not empty %}
+                                                        <div class="mb-1">
+                                                            <small class="text-muted">Pages :</small>
+                                                            {% for page in rec.pages %}
+                                                                <code class="text-warning small">{{ page }}</code>{% if not loop.last %} {% endif %}
+                                                            {% endfor %}
+                                                        </div>
+                                                    {% endif %}
+                                                    {% if rec.details %}
+                                                        <p class="mb-0 text-muted small" style="white-space: pre-line;">{{ rec.details }}</p>
+                                                    {% endif %}
+                                                </div>
+                                            {% endfor %}
+                                        {% endif %}
+                                    {% else %}
+                                        <p class="text-muted mb-0 text-center" style="font-size:0.85em;">Aucune donnée</p>
+                                    {% endif %}
+                                </div>
                             </div>
-                        {% endif %}
-                        <div class="text-light small" style="white-space:pre-wrap;">{{ rec.details }}</div>
-                    </div>
-                {% endfor %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                {# Fallback: ancien format texte brut #}
+                <p style="white-space:pre-wrap;">{{ summary.summary }}</p>
+                {% if summary.recommendations is not empty %}
+                    <h6 class="mt-3">Recommandations</h6>
+                    {% for rec in summary.recommendations %}
+                        {% set borderColors = { 'HIGH': 'danger', 'MEDIUM': 'warning', 'LOW': 'primary' } %}
+                        <div class="border-start border-4 border-{{ borderColors[rec.priority] ?? 'secondary' }} p-3 mb-2 rounded">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <span class="badge bg-{{ borderColors[rec.priority] ?? 'secondary' }}">{{ rec.priority }}</span>
+                                <span class="badge bg-secondary">{{ rec.category }}</span>
+                                <strong class="text-light">{{ rec.title }}</strong>
+                            </div>
+                            {% if rec.pages is defined and rec.pages is not empty %}
+                                <div class="mb-1">
+                                    <small class="text-muted">Pages concernées :</small>
+                                    {% for page in rec.pages %}
+                                        <code class="text-warning small">{{ page }}</code>{% if not loop.last %} {% endif %}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="text-light small" style="white-space:pre-wrap;">{{ rec.details }}</div>
+                        </div>
+                    {% endfor %}
+                {% endif %}
             {% endif %}
         </div>
     </div>
@@ -148,10 +199,11 @@
                 <thead>
                     <tr>
                         <th>URL</th>
-                        <th class="text-center">Perf</th>
-                        <th class="text-center">Access.</th>
-                        <th class="text-center">SEO</th>
                         <th class="text-center">RGAA</th>
+                        <th class="text-center">Access.</th>
+                        <th class="text-center">Perf</th>
+                        <th class="text-center">BP</th>
+                        <th class="text-center">SEO</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -163,9 +215,9 @@
                                 </a>
                             </td>
                             <td class="text-center">
-                                {% if report.lhPerformance is not null %}
-                                    <span class="{{ report.lhPerformance >= 90 ? 'text-success' : report.lhPerformance >= 50 ? 'text-warning' : 'text-danger' }} fw-bold">
-                                        {{ report.lhPerformance|round }}
+                                {% if report.rgaaScore is not null %}
+                                    <span class="{{ report.rgaaScore >= 90 ? 'text-success' : report.rgaaScore >= 50 ? 'text-warning' : 'text-danger' }} fw-bold">
+                                        {{ report.rgaaScore|round }}
                                     </span>
                                 {% else %}-{% endif %}
                             </td>
@@ -177,16 +229,23 @@
                                 {% else %}-{% endif %}
                             </td>
                             <td class="text-center">
-                                {% if report.lhSeo is not null %}
-                                    <span class="{{ report.lhSeo >= 90 ? 'text-success' : report.lhSeo >= 50 ? 'text-warning' : 'text-danger' }} fw-bold">
-                                        {{ report.lhSeo|round }}
+                                {% if report.lhPerformance is not null %}
+                                    <span class="{{ report.lhPerformance >= 90 ? 'text-success' : report.lhPerformance >= 50 ? 'text-warning' : 'text-danger' }} fw-bold">
+                                        {{ report.lhPerformance|round }}
                                     </span>
                                 {% else %}-{% endif %}
                             </td>
                             <td class="text-center">
-                                {% if report.rgaaScore is not null %}
-                                    <span class="{{ report.rgaaScore >= 90 ? 'text-success' : report.rgaaScore >= 50 ? 'text-warning' : 'text-danger' }} fw-bold">
-                                        {{ report.rgaaScore|round }}
+                                {% if report.lhBestPractices is not null %}
+                                    <span class="{{ report.lhBestPractices >= 90 ? 'text-success' : report.lhBestPractices >= 50 ? 'text-warning' : 'text-danger' }} fw-bold">
+                                        {{ report.lhBestPractices|round }}
+                                    </span>
+                                {% else %}-{% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if report.lhSeo is not null %}
+                                    <span class="{{ report.lhSeo >= 90 ? 'text-success' : report.lhSeo >= 50 ? 'text-warning' : 'text-danger' }} fw-bold">
+                                        {{ report.lhSeo|round }}
                                     </span>
                                 {% else %}-{% endif %}
                             </td>

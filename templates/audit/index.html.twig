@@ -32,8 +32,12 @@
                     <tr>
                         <th>Nom</th>
                         <th>URL</th>
+                        <th class="text-center">RGAA</th>
+                        <th class="text-center">A11y</th>
+                        <th class="text-center">Perf</th>
+                        <th class="text-center">BP</th>
+                        <th class="text-center">SEO</th>
                         <th>Analyses</th>
-                        <th>Dernière analyse</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
@@ -46,17 +50,19 @@
                                 </a>
                             </td>
                             <td><code>{{ site.rootUrl }}</code></td>
+                            {% set scores = siteScores[site.id] ?? null %}
+                            {% set labels = {'rgaa': 'RGAA', 'a11y': 'A11y', 'perf': 'Perf', 'bp': 'BP', 'seo': 'SEO'} %}
+                            {% set order = ['rgaa', 'a11y', 'perf', 'bp', 'seo'] %}
+                            {% for key in order %}
+                                <td class="text-center">
+                                    {% if scores and scores[key] is not null %}
+                                        <span class="fw-bold {{ scores[key] >= 90 ? 'text-success' : scores[key] >= 50 ? 'text-warning' : 'text-danger' }}">{{ scores[key] }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                            {% endfor %}
                             <td>{{ site.analyses|length }}</td>
-                            <td>
-                                {% if site.analyses|length > 0 %}
-                                    {% set last = site.analyses|first %}
-                                    <span class="badge bg-{{ last.status == 'completed' ? 'success' : last.status == 'running' ? 'warning' : last.status == 'failed' ? 'danger' : 'secondary' }}">
-                                        {{ last.createdAt|date('d/m/Y H:i') }}
-                                    </span>
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
                             <td class="text-end">
                                 <a href="{{ path('audit_site', {id: site.id}) }}" class="btn btn-sm btn-outline-primary">
                                     <i class="fa-solid fa-eye"></i>

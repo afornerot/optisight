@@ -98,7 +98,7 @@
                 {% endif %}
             {% endif %}
 
-            <content style="margin: 0px auto; {{ (maxwidth is defined ? "max-width:"~maxwidth~"px;":"") }}">
+            <content style="margin: 0px auto; overflow-x: hidden; {{ (maxwidth is defined ? "max-width:"~maxwidth~"px;":"") }}">
                 {% block body %}
                 {% endblock %}
             </content>

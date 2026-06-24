@@ -1,0 +1,190 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Authentification - {{ site.name }}{% endblock %}
+
+{% block body %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ path('audit_index') }}">Audit</a></li>
+        <li class="breadcrumb-item"><a href="{{ path('audit_site', {id: site.id}) }}">{{ site.name }}</a></li>
+        <li class="breadcrumb-item active">Authentification</li>
+    </ol>
+</nav>
+
+{% for message in app.flashes('success') %}
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+{% endfor %}
+{% for message in app.flashes('danger') %}
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+{% endfor %}
+{% for message in app.flashes('warning') %}
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+{% endfor %}
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+
+        {# ── Mode Cookie ── #}
+        {% if site.authType == 'cookie' and site.authCookies %}
+            <div class="card border-success mb-4">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="fa-solid fa-check-circle"></i> Cookie configuré</h6>
+                    <form method="post" action="{{ path('audit_auth_test', {id: site.id}) }}">
+                        <button type="submit" class="btn btn-sm btn-light">
+                            <i class="fa-solid fa-plug"></i> Tester
+                        </button>
+                    </form>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">Un cookie de session est actif. Les crawl et analyses l'utiliseront automatiquement.</p>
+                    <small class="text-muted">Les cookies expirent. Si le crawl échoue (erreur 401/403), mettez à jour le cookie ci-dessous.</small>
+                </div>
+            </div>
+        {% endif %}
+
+        {# ── Mode Form ── #}
+        {% if site.authType == 'form' and site.authCookies %}
+            <div class="card border-success mb-4">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="fa-solid fa-check-circle"></i> Connecté via formulaire</h6>
+                    <form method="post" action="{{ path('audit_auth_test', {id: site.id}) }}">
+                        <button type="submit" class="btn btn-sm btn-light">
+                            <i class="fa-solid fa-plug"></i> Tester
+                        </button>
+                    </form>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">{{ site.authCookies|length > 0 ? (site.authCookies|json_encode|length ~ ' caractères de cookies stockés') : 'Cookies en attente de récupération.' }}</p>
+                </div>
+            </div>
+        {% endif %}
+
+        {# ── Formulaire de config ── #}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0"><i class="fa-solid fa-lock"></i> Configuration — {{ site.name }}</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    <div class="mb-3">
+                        <label for="auth_type" class="form-label">Type d'authentification</label>
+                        <select class="form-select" id="auth_type" name="auth_type">
+                            <option value="" {{ site.authType is null or site.authType == '' ? 'selected' : '' }}>Aucune</option>
+                            <option value="cookie" {{ site.authType == 'cookie' ? 'selected' : '' }}>Cookie de session (copier-coller)</option>
+                            <option value="form" {{ site.authType == 'form' ? 'selected' : '' }}>Formulaire automatique (Puppeteer)</option>
+                        </select>
+                    </div>
+
+                    {# ── Section Cookie ── #}
+                    <div id="section-cookie" class="{{ site.authType != 'cookie' ? 'd-none' : '' }}">
+                        <div class="alert alert-info">
+                            <h6><i class="fa-solid fa-circle-info"></i> Comment obtenir le cookie</h6>
+                            <ol class="mb-0 mt-2">
+                                <li>Ouvrez <a href="{{ site.rootUrl }}" target="_blank">{{ site.rootUrl }}</a> et connectez-vous.</li>
+                                <li>Ouvrez les <strong>Dev Tools</strong> (<kbd>F12</kbd>).</li>
+                                <li>Allez dans <strong>Application</strong> → <strong>Cookies</strong> → sélectionnez le domaine.</li>
+                                <li>Trouvez le cookie de session (<code>PHPSESSID</code>, <code>JSESSIONID</code>, <code>connect.sid</code>, etc.).</li>
+                                <li>Copiez la <strong>valeur</strong> du cookie.</li>
+                            </ol>
+                        </div>
+                        <div class="mb-3">
+                            <label for="auth_cookies" class="form-label">Valeur du cookie</label>
+                            <textarea class="form-control font-monospace" id="auth_cookies" name="auth_cookies" rows="3"
+                                      placeholder="PHPSESSID=abc123def456">{{ site.authCookies }}</textarea>
+                        </div>
+                    </div>
+
+                    {# ── Section Formulaire ── #}
+                    <div id="section-form" class="{{ site.authType != 'form' ? 'd-none' : '' }}">
+                        <div class="alert alert-info">
+                            <h6><i class="fa-solid fa-circle-info"></i> Connexion automatique via Puppeteer</h6>
+                            <p class="mb-0">L'application ouvrira un navigateur Chromium, naviguera vers la page de login, remplira le formulaire et capturera les cookies de session.</p>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="auth_login_url" class="form-label">URL de la page de login</label>
+                            <input type="url" class="form-control" id="auth_login_url" name="auth_login_url"
+                                   value="{{ site.authLoginUrl }}"
+                                   placeholder="https://example.com/login">
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="auth_username_field" class="form-label">Sélecteur champ username</label>
+                                <input type="text" class="form-control font-monospace" id="auth_username_field" name="auth_username_field"
+                                       value="{{ site.authUsernameField }}"
+                                       placeholder="input[name=email] ou #username">
+                                <div class="form-text">Sélecteur CSS du champ identifiant.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="auth_password_field" class="form-label">Sélecteur champ password</label>
+                                <input type="text" class="form-control font-monospace" id="auth_password_field" name="auth_password_field"
+                                       value="{{ site.authPasswordField }}"
+                                       placeholder="input[name=password] ou #password">
+                                <div class="form-text">Sélecteur CSS du champ mot de passe.</div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="auth_username" class="form-label">Identifiant</label>
+                                <input type="text" class="form-control" id="auth_username" name="auth_username"
+                                       value="{{ site.authUsername }}"
+                                       placeholder="votre@email.fr">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="auth_password" class="form-label">Mot de passe</label>
+                                <input type="password" class="form-control" id="auth_password" name="auth_password"
+                                       value="{{ site.authPassword }}"
+                                       placeholder="••••••••">
+                            </div>
+                        </div>
+
+                        {% if site.authType == 'form' %}
+                            <div class="mb-3">
+                                <button type="submit" formaction="{{ path('audit_auth_login', {id: site.id}) }}" class="btn btn-success">
+                                    <i class="fa-solid fa-right-to-bracket"></i> Lancer la connexion
+                                </button>
+                                <small class="text-muted ms-2">Ouvre Chromium, se connecte et récupère les cookies.</small>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fa-solid fa-save"></i> Enregistrer
+                        </button>
+                        <a href="{{ path('audit_site', {id: site.id}) }}" class="btn btn-outline-secondary">Retour</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const typeSelect = document.getElementById('auth_type');
+    const sectionCookie = document.getElementById('section-cookie');
+    const sectionForm = document.getElementById('section-form');
+
+    function toggleSections() {
+        const val = typeSelect.value;
+        sectionCookie.classList.toggle('d-none', val !== 'cookie');
+        sectionForm.classList.toggle('d-none', val !== 'form');
+    }
+
+    typeSelect.addEventListener('change', toggleSections);
+    toggleSections();
+});
+</script>
+{% endblock %}

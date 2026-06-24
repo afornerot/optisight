@@ -48,6 +48,17 @@ class CrawlCommand extends Command
         $output->writeln("SITE:{$site->getName()}");
         $output->writeln("URL:{$site->getRootUrl()}");
 
+        $cookieHeader = $site->getCookieHeader();
+
+        if ($cookieHeader !== null) {
+            $output->writeln("AUTH:Mode cookie activé");
+        }
+
+        $excludePatterns = $site->getExcludePatterns();
+        if (!empty($excludePatterns)) {
+            $output->writeln("EXCLUDE:" . count($excludePatterns) . " règle(s) d'exclusion");
+        }
+
         try {
             $pages = $this->crawler->crawl(
                 $site->getRootUrl(),
@@ -62,13 +73,14 @@ class CrawlCommand extends Command
                     return $site && $site->getCrawlStatus() === Site::CRAWL_STATUS_CANCELLED;
                 },
                 // onPageFound — écrit en temps réel
-                function (array $page) use ($output) {
+                function (array $page) use ($output, $site) {
                     if (isset($page['skipped'])) {
                         $output->writeln("SKIP:{$page['url']}:{$page['reason']}");
                     } else {
                         $output->writeln("FOUND:{$page['status']}:{$page['url']}:{$page['title']}");
                     }
-                }
+                },
+                $cookieHeader
             );
 
             $pagesCount = count($pages);
@@ -76,10 +88,26 @@ class CrawlCommand extends Command
             if ($pagesCount === 0) {
                 $output->writeln("WARN:Aucune page HTML découverte.");
             } else {
-                $output->writeln("DONE:{$pagesCount} page(s) découverte(s).");
+                $filteredPages = [];
+                $excludedCount = 0;
+                foreach ($pages as $page) {
+                    if ($site->isUrlExcluded($page['url'])) {
+                        $excludedCount++;
+                        $output->writeln("EXCLUDED:{$page['url']}");
+                        continue;
+                    }
+                    $filteredPages[] = $page;
+                }
+
+                if ($excludedCount > 0) {
+                    $output->writeln("INFO:{$excludedCount} page(s) exclue(s) par les règles d'exclusion.");
+                }
+
+                $finalCount = count($filteredPages);
+                $output->writeln("DONE:{$finalCount} page(s) découverte(s).");
 
                 $crawlData = [];
-                foreach ($pages as $page) {
+                foreach ($filteredPages as $page) {
                     $crawlData[] = [
                         'url' => $page['url'],
                         'status' => $page['status'],
@@ -93,7 +121,7 @@ class CrawlCommand extends Command
 
                 $site->setCrawlStatus(Site::CRAWL_STATUS_COMPLETED);
                 $site->setLastCrawledAt(new \DateTimeImmutable());
-                $site->setCrawledPages($pagesCount);
+                $site->setCrawledPages($finalCount);
                 $site->setCrawlMetadata($crawlData);
                 $this->em->flush();
             }

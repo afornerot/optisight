@@ -39,6 +39,27 @@ class Site
     private ?\DateTimeImmutable $updatedAt = null;
 
     #[ORM\Column(length: 20, nullable: true)]
+    private ?string $authType = null;
+
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $authCookies = null;
+
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $authLoginUrl = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $authUsernameField = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $authPasswordField = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $authUsername = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $authPassword = null;
+
+    #[ORM\Column(length: 20, nullable: true)]
     private ?string $crawlStatus = null;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
@@ -49,6 +70,9 @@ class Site
 
     #[ORM\Column(type: Types::JSON, nullable: true)]
     private ?array $crawlMetadata = null;
+
+    #[ORM\Column(type: Types::JSON, nullable: true)]
+    private ?array $excludePatterns = null;
 
     /** @var Collection<int, Analysis> */
     #[ORM\OneToMany(targetEntity: Analysis::class, mappedBy: 'site', orphanRemoval: true)]
@@ -136,6 +160,113 @@ class Site
         return $this->analyses->isEmpty() ? null : $this->analyses->first();
     }
 
+    public function getAuthType(): ?string
+    {
+        return $this->authType;
+    }
+
+    public function setAuthType(?string $authType): static
+    {
+        $this->authType = $authType;
+        return $this;
+    }
+
+    public function getAuthCookies(): ?string
+    {
+        return $this->authCookies;
+    }
+
+    public function setAuthCookies(?string $authCookies): static
+    {
+        $this->authCookies = $authCookies;
+        return $this;
+    }
+
+    public function getAuthLoginUrl(): ?string
+    {
+        return $this->authLoginUrl;
+    }
+
+    public function setAuthLoginUrl(?string $authLoginUrl): static
+    {
+        $this->authLoginUrl = $authLoginUrl;
+        return $this;
+    }
+
+    public function getAuthUsernameField(): ?string
+    {
+        return $this->authUsernameField;
+    }
+
+    public function setAuthUsernameField(?string $authUsernameField): static
+    {
+        $this->authUsernameField = $authUsernameField;
+        return $this;
+    }
+
+    public function getAuthPasswordField(): ?string
+    {
+        return $this->authPasswordField;
+    }
+
+    public function setAuthPasswordField(?string $authPasswordField): static
+    {
+        $this->authPasswordField = $authPasswordField;
+        return $this;
+    }
+
+    public function getAuthUsername(): ?string
+    {
+        return $this->authUsername;
+    }
+
+    public function setAuthUsername(?string $authUsername): static
+    {
+        $this->authUsername = $authUsername;
+        return $this;
+    }
+
+    public function getAuthPassword(): ?string
+    {
+        return $this->authPassword;
+    }
+
+    public function setAuthPassword(?string $authPassword): static
+    {
+        $this->authPassword = $authPassword;
+        return $this;
+    }
+
+    /**
+     * Get cookies as array of [{name, value, domain, path, ...}] or null.
+     */
+    public function getAuthCookiesArray(): ?array
+    {
+        if ($this->authCookies === null || $this->authCookies === '') {
+            return null;
+        }
+        $decoded = json_decode($this->authCookies, true);
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    /**
+     * Get cookie header string suitable for HTTP requests (e.g. "name1=value1; name2=value2").
+     */
+    public function getCookieHeader(): ?string
+    {
+        $cookies = $this->getAuthCookiesArray();
+        if (!$cookies) {
+            return null;
+        }
+        $parts = [];
+        foreach ($cookies as $cookie) {
+            if (isset($cookie['name'], $cookie['value'])) {
+                $parts[] = $cookie['name'] . '=' . $cookie['value'];
+            }
+        }
+        return !empty($parts) ? implode('; ', $parts) : null;
+    }
+
     public function getCrawlStatus(): ?string
     {
         return $this->crawlStatus;
@@ -178,5 +309,63 @@ class Site
     {
         $this->crawlMetadata = $crawlMetadata;
         return $this;
+    }
+
+    public function getExcludePatterns(): ?array
+    {
+        return $this->excludePatterns;
+    }
+
+    public function setExcludePatterns(?array $excludePatterns): static
+    {
+        $this->excludePatterns = $excludePatterns;
+        return $this;
+    }
+
+    /**
+     * Check if a URL matches any exclude pattern.
+     * Each pattern: {type: "starts_with|contains|ends_with|equals", value: string}
+     */
+    public function isUrlExcluded(string $url): bool
+    {
+        if (empty($this->excludePatterns)) {
+            return false;
+        }
+
+        $path = parse_url($url, PHP_URL_PATH) ?? '/';
+        $path = rtrim($path, '/');
+
+        foreach ($this->excludePatterns as $pattern) {
+            $type = $pattern['type'] ?? '';
+            $value = $pattern['value'] ?? '';
+            if ($value === '') {
+                continue;
+            }
+
+            switch ($type) {
+                case 'starts_with':
+                    if (str_starts_with($path, $value)) {
+                        return true;
+                    }
+                    break;
+                case 'contains':
+                    if (str_contains($path, $value)) {
+                        return true;
+                    }
+                    break;
+                case 'ends_with':
+                    if (str_ends_with($path, $value)) {
+                        return true;
+                    }
+                    break;
+                case 'equals':
+                    if ($path === $value) {
+                        return true;
+                    }
+                    break;
+            }
+        }
+
+        return false;
     }
 }
