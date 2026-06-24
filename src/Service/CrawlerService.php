@@ -66,13 +66,37 @@ class CrawlerService
                     $headers['Cookie'] = $cookieHeader;
                 }
 
-                $response = $this->http->request('GET', $url, [
-                    'timeout' => 10,
-                    'max_redirects' => 5,
-                    'headers' => $headers,
-                ]);
+                $redirects = 0;
+                $currentUrl = $url;
+                $maxRedirects = 5;
+                do {
+                    $response = $this->http->request('GET', $currentUrl, [
+                        'timeout' => 10,
+                        'max_redirects' => 0,
+                        'headers' => $headers,
+                    ]);
 
-                $statusCode = $response->getStatusCode();
+                    $statusCode = $response->getStatusCode();
+                    $location = $response->getHeaders(false)['location'][0] ?? null;
+
+                    if ($statusCode >= 300 && $statusCode < 400 && $location !== null) {
+                        $redirectUrl = $location;
+                        if (str_starts_with($location, '/')) {
+                            $parts = parse_url($currentUrl);
+                            $port = $parts['port'] ?? null;
+                            $redirectUrl = $parts['scheme'] . '://' . $parts['host'] . ($port !== null ? ':' . $port : '') . $location;
+                        }
+                        $redirectHost = parse_url($redirectUrl, PHP_URL_HOST);
+                        if ($redirectHost !== $baseHost) {
+                            break;
+                        }
+                        $currentUrl = $redirectUrl;
+                        $redirects++;
+                    } else {
+                        break;
+                    }
+                } while ($redirects < $maxRedirects);
+
                 $body = $response->getContent(false);
                 $contentType = $response->getHeaders(false)['content-type'][0] ?? '';
 
