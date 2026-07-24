@@ -7,6 +7,7 @@ use App\Entity\PageReport;
 use App\Service\LighthouseService;
 use App\Service\Pa11yService;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -20,6 +21,7 @@ class RgaaCommand extends Command
         private EntityManagerInterface $em,
         private LighthouseService $lighthouse,
         private Pa11yService $pa11y,
+        private LoggerInterface $logger,
     ) {
         parent::__construct();
     }
@@ -77,6 +79,7 @@ class RgaaCommand extends Command
                 }
 
                 $output->writeln("PAGE_START:{$num}:{$total}:{$page['url']}");
+                $this->logger->info('RGAA page started', ['num' => $num, 'total' => $total, 'url' => $page['url']]);
 
                 $report = new PageReport();
                 $report->setAnalysis($analysis);
@@ -118,6 +121,13 @@ class RgaaCommand extends Command
                 $this->em->persist($report);
                 $this->em->flush();
 
+                $this->logger->info('RGAA page completed', [
+                    'num' => $num,
+                    'url' => $page['url'],
+                    'lh_result' => $lhResult !== null,
+                    'pa11y_result' => $paResult !== null,
+                ]);
+
                 $analysis->setPagesCrawled($num);
                 $this->em->flush();
             }
@@ -130,7 +140,9 @@ class RgaaCommand extends Command
             }
 
             $output->writeln("DONE:{$total} page(s) analysée(s).");
+            $this->logger->info('RGAA analysis completed', ['total' => $total]);
         } catch (\Exception $e) {
+            $this->logger->error('RGAA analysis failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             $this->em->clear();
             $analysis = $this->em->getRepository(Analysis::class)->find($id);
             if ($analysis) {

@@ -223,6 +223,135 @@ class AnalysisController extends AbstractController
         );
     }
 
+    #[Route('/{id}/markdown', name: 'audit_analysis_markdown', methods: ['GET'])]
+    public function markdown(int $id): Response
+    {
+        $analysis = $this->em->getRepository(Analysis::class)->find($id);
+        if (!$analysis) {
+            throw $this->createNotFoundException('Analyse non trouvée');
+        }
+
+        $reports = $this->em->getRepository(PageReport::class)
+            ->findBy(['analysis' => $analysis], ['url' => 'ASC']);
+
+        $summary = $this->em->getRepository(AiSummary::class)
+            ->findOneBy(['analysis' => $analysis], ['createdAt' => 'DESC']);
+
+        $normalizedSummary = null;
+        if ($summary) {
+            $normalizedSummary = [
+                'summary' => is_string($summary->getSummary()) ? $summary->getSummary() : $this->normalizeToText($summary->getSummary()),
+                'summaryJson' => $summary->getSummaryJson() ?? [],
+                'recommendations' => array_map(function ($rec) {
+                    if (isset($rec['details']) && is_array($rec['details'])) {
+                        $rec['details'] = $this->formatDetails($rec['details']);
+                    }
+                    if (!isset($rec['pages']) || !is_array($rec['pages'])) {
+                        $rec['pages'] = [];
+                    }
+                    return $rec;
+                }, $summary->getRecommendations() ?? []),
+            ];
+        }
+
+        $md = "# Rapport d'audit web\n\n";
+        $md .= "## Informations générales\n\n";
+        $md .= "- **Site** : {$analysis->getSite()->getName()} ({$analysis->getSite()->getRootUrl()})\n";
+        if ($analysis->getSite()->getProdUrl()) {
+            $md .= "- **Prod** : {$analysis->getSite()->getProdUrl()}\n";
+        }
+        $md .= "- **Date** : {$analysis->getCreatedAt()->format('d/m/Y à H:i')}\n";
+        $md .= "- **Pages analysées** : " . count($reports) . "\n";
+        if ($analysis->getDuration()) {
+            $md .= "- **Durée** : {$analysis->getDuration()}\n";
+        }
+        $md .= "\n";
+
+        if (!empty($reports)) {
+            $avgPerf = $avgA11y = $avgSeo = $avgBp = $avgRgaa = 0;
+            $count = count($reports);
+            foreach ($reports as $r) {
+                $avgPerf += $r->getLhPerformance() ?? 0;
+                $avgA11y += $r->getLhAccessibility() ?? 0;
+                $avgSeo += $r->getLhSeo() ?? 0;
+                $avgBp += $r->getLhBestPractices() ?? 0;
+                $avgRgaa += $r->getRgaaScore() ?? 0;
+            }
+            $avgPerf = $count > 0 ? round($avgPerf / $count) : 0;
+            $avgA11y = $count > 0 ? round($avgA11y / $count) : 0;
+            $avgSeo = $count > 0 ? round($avgSeo / $count) : 0;
+            $avgBp = $count > 0 ? round($avgBp / $count) : 0;
+            $avgRgaa = $count > 0 ? round($avgRgaa / $count) : 0;
+
+            $md .= "## Scores moyens\n\n";
+            $md .= "| Indicateur | Score |\n";
+            $md .= "|------------|-------|\n";
+            $md .= "| RGAA | {$avgRgaa}/100 |\n";
+            $md .= "| Accessibilité | {$avgA11y}/100 |\n";
+            $md .= "| Performance | {$avgPerf}/100 |\n";
+            $md .= "| Bonnes Pratiques | {$avgBp}/100 |\n";
+            $md .= "| SEO | {$avgSeo}/100 |\n";
+            $md .= "\n";
+
+            $md .= "## Détails par page\n\n";
+            $md .= "| URL | RGAA | A11y | Perf | BP | SEO |\n";
+            $md .= "|-----|------|------|------|----|----|\n";
+            foreach ($reports as $r) {
+                $path = parse_url($r->getUrl(), PHP_URL_PATH) ?: '/';
+                $rgaa = $r->getRgaaScore();
+                $a11y = $r->getLhAccessibility();
+                $perf = $r->getLhPerformance();
+                $bp = $r->getLhBestPractices();
+                $seo = $r->getLhSeo();
+                $md .= "| {$path} | " . ($rgaa !== null ? "{$rgaa}" : '-') . " | " . ($a11y !== null ? "{$a11y}" : '-') . " | " . ($perf !== null ? "{$perf}" : '-') . " | " . ($bp !== null ? "{$bp}" : '-') . " | " . ($seo !== null ? "{$seo}" : '-') . " |\n";
+            }
+            $md .= "\n";
+        }
+
+        if ($normalizedSummary) {
+            $md .= "## Analyse IA\n\n";
+            $md .= $this->cleanMarkdown($normalizedSummary['summary']) . "\n\n";
+
+            if (!empty($normalizedSummary['recommendations'])) {
+                $md .= "## Recommandations\n\n";
+                foreach ($normalizedSummary['recommendations'] as $rec) {
+                    $priority = $rec['priority'] ?? 'LOW';
+                    $category = $rec['category'] ?? '';
+                    $title = $rec['title'] ?? '';
+                    $pages = !empty($rec['pages']) ? '**Pages** : ' . implode(', ', $rec['pages']) : '';
+                    $details = $rec['details'] ?? '';
+
+                    $md .= "### {$title}\n\n";
+                    $md .= "- **Priorité** : {$priority}\n";
+                    if ($category) {
+                        $md .= "- **Catégorie** : {$category}\n";
+                    }
+                    if ($pages) {
+                        $md .= "- {$pages}\n";
+                    }
+                    if ($details) {
+                        $md .= "\n{$details}\n";
+                    }
+                    $md .= "\n";
+                }
+            }
+        }
+
+        $filename = sprintf('rapport-audit-%s-%s.md',
+            $analysis->getSite()->getName(),
+            $analysis->getCreatedAt()->format('Y-m-d')
+        );
+
+        return new Response(
+            $md,
+            200,
+            [
+                'Content-Type' => 'text/markdown; charset=utf-8',
+                'Content-Disposition' => sprintf('attachment; filename="%s"', $filename),
+            ]
+        );
+    }
+
     private function normalizeToText(mixed $value): string
     {
         if (is_string($value)) {
@@ -251,6 +380,17 @@ class AnalysisController extends AbstractController
             $parts[] = "Impact : {$details['impact']}";
         }
         return implode("\n\n", $parts);
+    }
+
+    private function cleanMarkdown(?string $text): string
+    {
+        if (!$text) {
+            return '';
+        }
+        $text = preg_replace('/\*\*(.+?)\*\*/', '$1', $text);
+        $text = preg_replace('/\*(.+?)\*/', '$1', $text);
+        $text = preg_replace('/`(.+?)`/', '$1', $text);
+        return $text;
     }
 
     #[Route('/{id}/page/{reportId}', name: 'audit_analysis_page', methods: ['GET'])]

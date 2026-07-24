@@ -55,33 +55,38 @@
         {% set avgPerf = 0 %}
         {% set avgA11y = 0 %}
         {% set avgSeo = 0 %}
+        {% set avgBp = 0 %}
         {% set avgRgaa = 0 %}
         {% set count = reports|length %}
         {% for r in reports %}
             {% set avgPerf = avgPerf + (r.lhPerformance ?? 0) %}
             {% set avgA11y = avgA11y + (r.lhAccessibility ?? 0) %}
             {% set avgSeo = avgSeo + (r.lhSeo ?? 0) %}
+            {% set avgBp = avgBp + (r.lhBestPractices ?? 0) %}
             {% set avgRgaa = avgRgaa + (r.rgaaScore ?? 0) %}
         {% endfor %}
         {% set avgPerf = count > 0 ? (avgPerf / count)|round : 0 %}
         {% set avgA11y = count > 0 ? (avgA11y / count)|round : 0 %}
         {% set avgSeo = count > 0 ? (avgSeo / count)|round : 0 %}
+        {% set avgBp = count > 0 ? (avgBp / count)|round : 0 %}
         {% set avgRgaa = count > 0 ? (avgRgaa / count)|round : 0 %}
 
         <h2>Scores moyens</h2>
         <div class="scores">
             <table>
                 <tr>
-                    <th>Performance</th>
-                    <th>Accessibilité</th>
-                    <th>SEO</th>
                     <th>RGAA</th>
+                    <th>Accessibilité</th>
+                    <th>Performance</th>
+                    <th>Bonnes Pratiques</th>
+                    <th>SEO</th>
                 </tr>
                 <tr>
-                    <td><span class="score-val {{ avgPerf >= 90 ? 'score-green' : avgPerf >= 50 ? 'score-orange' : 'score-red' }}">{{ avgPerf }}/100</span></td>
-                    <td><span class="score-val {{ avgA11y >= 90 ? 'score-green' : avgA11y >= 50 ? 'score-orange' : 'score-red' }}">{{ avgA11y }}/100</span></td>
-                    <td><span class="score-val {{ avgSeo >= 90 ? 'score-green' : avgSeo >= 50 ? 'score-orange' : 'score-red' }}">{{ avgSeo }}/100</span></td>
                     <td><span class="score-val {{ avgRgaa >= 90 ? 'score-green' : avgRgaa >= 50 ? 'score-orange' : 'score-red' }}">{{ avgRgaa }}/100</span></td>
+                    <td><span class="score-val {{ avgA11y >= 90 ? 'score-green' : avgA11y >= 50 ? 'score-orange' : 'score-red' }}">{{ avgA11y }}/100</span></td>
+                    <td><span class="score-val {{ avgPerf >= 90 ? 'score-green' : avgPerf >= 50 ? 'score-orange' : 'score-red' }}">{{ avgPerf }}/100</span></td>
+                    <td><span class="score-val {{ avgBp >= 90 ? 'score-green' : avgBp >= 50 ? 'score-orange' : 'score-red' }}">{{ avgBp }}/100</span></td>
+                    <td><span class="score-val {{ avgSeo >= 90 ? 'score-green' : avgSeo >= 50 ? 'score-orange' : 'score-red' }}">{{ avgSeo }}/100</span></td>
                 </tr>
             </table>
         </div>
@@ -122,10 +127,11 @@
             <thead>
                 <tr>
                     <th>URL</th>
-                    <th style="text-align:center;">Perf</th>
-                    <th style="text-align:center;">Access.</th>
-                    <th style="text-align:center;">SEO</th>
                     <th style="text-align:center;">RGAA</th>
+                    <th style="text-align:center;">A11y</th>
+                    <th style="text-align:center;">Perf</th>
+                    <th style="text-align:center;">BP</th>
+                    <th style="text-align:center;">SEO</th>
                 </tr>
             </thead>
             <tbody>
@@ -133,8 +139,8 @@
                     <tr>
                         <td>{{ report.url }}</td>
                         <td style="text-align:center;">
-                            {% if report.lhPerformance is not null %}
-                                <span class="{{ report.lhPerformance >= 90 ? 'score-green' : report.lhPerformance >= 50 ? 'score-orange' : 'score-red' }}">{{ report.lhPerformance|round }}</span>
+                            {% if report.rgaaScore is not null %}
+                                <span class="{{ report.rgaaScore >= 90 ? 'score-green' : report.rgaaScore >= 50 ? 'score-orange' : 'score-red' }}">{{ report.rgaaScore|round }}</span>
                             {% else %}-{% endif %}
                         </td>
                         <td style="text-align:center;">
@@ -143,13 +149,18 @@
                             {% else %}-{% endif %}
                         </td>
                         <td style="text-align:center;">
-                            {% if report.lhSeo is not null %}
-                                <span class="{{ report.lhSeo >= 90 ? 'score-green' : report.lhSeo >= 50 ? 'score-orange' : 'score-red' }}">{{ report.lhSeo|round }}</span>
+                            {% if report.lhPerformance is not null %}
+                                <span class="{{ report.lhPerformance >= 90 ? 'score-green' : report.lhPerformance >= 50 ? 'score-orange' : 'score-red' }}">{{ report.lhPerformance|round }}</span>
                             {% else %}-{% endif %}
                         </td>
                         <td style="text-align:center;">
-                            {% if report.rgaaScore is not null %}
-                                <span class="{{ report.rgaaScore >= 90 ? 'score-green' : report.rgaaScore >= 50 ? 'score-orange' : 'score-red' }}">{{ report.rgaaScore|round }}</span>
+                            {% if report.lhBestPractices is not null %}
+                                <span class="{{ report.lhBestPractices >= 90 ? 'score-green' : report.lhBestPractices >= 50 ? 'score-orange' : 'score-red' }}">{{ report.lhBestPractices|round }}</span>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td style="text-align:center;">
+                            {% if report.lhSeo is not null %}
+                                <span class="{{ report.lhSeo >= 90 ? 'score-green' : report.lhSeo >= 50 ? 'score-orange' : 'score-red' }}">{{ report.lhSeo|round }}</span>
                             {% else %}-{% endif %}
                         </td>
                     </tr>

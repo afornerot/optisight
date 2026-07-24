@@ -7,6 +7,7 @@ use App\Entity\Analysis;
 use App\Entity\PageReport;
 use App\Service\AiService;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -19,6 +20,7 @@ class AiCommand extends Command
     public function __construct(
         private EntityManagerInterface $em,
         private AiService $ai,
+        private LoggerInterface $logger,
     ) {
         parent::__construct();
     }
@@ -49,6 +51,7 @@ class AiCommand extends Command
         $output->writeln("TITLE:Synthèse IA");
         $output->writeln("STEP:Envoi des données au modèle IA...");
         $output->writeln("PAGES:" . count($reports));
+        $this->logger->info('AI synthesis started', ['analysis_id' => $id, 'reports_count' => count($reports)]);
 
         try {
             $pagesScores = [];
@@ -143,8 +146,11 @@ class AiCommand extends Command
                 $num = $idx + 1;
                 $label = $labels[$indicator];
                 $output->writeln("STEP:({$num}/5) Analyse {$label}...");
+                $this->logger->info('AI indicator started', ['indicator' => $indicator, 'num' => $num]);
 
                 $aiResult = $this->ai->synthesizeReportByIndicator($pagesData, $indicator);
+
+                $this->logger->info('AI indicator completed', ['indicator' => $indicator, 'has_result' => $aiResult !== null]);
 
                 if ($aiResult) {
                     $allResults[$indicator] = $aiResult;
@@ -200,6 +206,7 @@ class AiCommand extends Command
                 $output->writeln("WARN:Aucun résultat IA obtenu (clé API non configurée ?).");
             }
         } catch (\Exception $e) {
+            $this->logger->error('AI synthesis failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             $output->writeln("ERROR:Échec de la synthèse IA : {$e->getMessage()}");
             return Command::FAILURE;
         }

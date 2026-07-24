@@ -31,6 +31,9 @@
         <a href="{{ path('audit_analysis_pdf', {id: analysis.id}) }}" class="btn btn-outline-primary btn-sm me-2" target="_blank">
             <i class="fa-solid fa-file-pdf"></i> Rapport PDF
         </a>
+        <a href="{{ path('audit_analysis_markdown', {id: analysis.id}) }}" class="btn btn-outline-primary btn-sm me-2" target="_blank">
+            <i class="fa-solid fa-file-lines"></i> Export MD
+        </a>
         <form method="post" action="{{ path('audit_analysis_delete', {id: analysis.id}) }}" class="d-inline" onsubmit="return confirm('Supprimer cette analyse et tous ses rapports ?')">
             <button type="submit" class="btn btn-outline-danger btn-sm">
                 <i class="fa-solid fa-trash"></i> Supprimer

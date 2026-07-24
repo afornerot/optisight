@@ -29,7 +29,7 @@ class Pa11yService
     {
         $config = [
             'chromeLaunchConfig' => [
-                'executablePath' => '/usr/bin/chromium-browser',
+                'executablePath' => '/usr/bin/chromium',
                 'args' => [
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
@@ -61,7 +61,7 @@ class Pa11yService
             $process->setTimeout(120);
             $process->setEnv(array_merge($_ENV, [
                 'PATH' => $this->getBinPath(),
-                'CHROME_BIN' => '/usr/bin/chromium-browser',
+                'CHROME_BIN' => '/usr/bin/chromium',
                 'PUPPETEER_CACHE_DIR' => '/tmp/puppeteer_cache',
             ]));
 

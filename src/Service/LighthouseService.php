@@ -25,7 +25,7 @@ class LighthouseService
             'lighthouse', $url,
             '--output=json',
             '--quiet',
-            '--chrome-flags=--headless --no-sandbox --disable-gpu --disable-dev-shm-usage',
+            '--chrome-flags=--headless --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-software-rasterizer',
             '--only-categories=performance,accessibility,seo,best-practices',
         ];
 
@@ -38,10 +38,14 @@ class LighthouseService
             $args[] = '--extra-headers=' . $extraHeadersFile;
         }
 
+        exec('pkill -9 chromium 2>/dev/null || true');
+        usleep(1000000);
+
         $process = new Process($args);
         $process->setTimeout(120);
         $process->setEnv(array_merge($_ENV, [
             'PATH' => $this->getBinPath(),
+            'CHROME_BIN' => '/usr/bin/chromium',
         ]));
 
         try {

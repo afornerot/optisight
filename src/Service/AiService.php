@@ -238,6 +238,7 @@ PROMPT;
     public function synthesizeReportByIndicator(array $pagesData, string $indicator): ?array
     {
         if (!$this->isConfigured()) {
+            $this->logger->warning('AI not configured, skipping synthesis');
             return null;
         }
 
@@ -245,7 +246,7 @@ PROMPT;
 
         $indicatorLabel = self::INDICATOR_LABELS[$indicator] ?? $indicator;
 
-        $this->logger->info('AI global synthesis prompt built', [
+        $this->logger->info('AI global synthesis starting', [
             'indicator' => $indicator,
             'prompt_length' => mb_strlen($prompt),
         ]);
@@ -383,6 +384,8 @@ PROMPT;
 
     private function callLlm(string $prompt, string $systemMessage, int $maxTokens): ?array
     {
+        $this->logger->info('AI LLM call starting', ['prompt_length' => mb_strlen($prompt), 'max_tokens' => $maxTokens]);
+
         try {
             $response = $this->http->request('POST', $this->baseUrl . '/chat/completions', [
                 'headers' => [
@@ -400,6 +403,8 @@ PROMPT;
                 ],
                 'timeout' => 120,
             ]);
+
+            $this->logger->info('AI HTTP request completed');
 
             $data = $response->toArray(false);
             $content = $data['choices'][0]['message']['content'] ?? null;
@@ -422,14 +427,20 @@ PROMPT;
             $result = json_decode($content, true);
 
             if (json_last_error() !== JSON_ERROR_NONE) {
+                $this->logger->warning('AI JSON parse failed, trying regex fallback', [
+                    'json_error' => json_last_error_msg(),
+                ]);
                 if (preg_match('/\{[\s\S]*\}/', $content, $matches)) {
                     $result = json_decode($matches[0], true);
                 }
             }
 
             if (!is_array($result)) {
+                $this->logger->warning('AI result is not an array', ['result_type' => gettype($result)]);
                 return null;
             }
+
+            $this->logger->info('AI LLM call successful');
 
             if (isset($result['summary'])) {
                 $result['summary'] = $this->normalizeSummary($result['summary']);
@@ -452,7 +463,7 @@ PROMPT;
 
             return $result;
         } catch (\Exception $e) {
-            $this->logger->error('AI call failed', ['error' => $e->getMessage()]);
+            $this->logger->error('AI call failed', ['error' => $e->getMessage(), 'exception_class' => get_class($e)]);
             return null;
         }
     }
