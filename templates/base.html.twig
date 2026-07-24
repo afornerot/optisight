@@ -62,6 +62,21 @@
                                     <i class="fa-solid fa-book"></i> API
                                 </a>
                             </li>
+                            {% if app.user %}
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false">
+                                    <i class="fa-solid fa-robot"></i> MCP
+                                </a>
+                                <div class="dropdown-menu">
+                                    <a class="dropdown-item" href="{{ path('mcp_keys_page') }}">
+                                        <i class="fa-solid fa-key"></i> Clés API
+                                    </a>
+                                    <a class="dropdown-item" href="{{ path('mcp_tools') }}" target="_blank">
+                                        <i class="fa-solid fa-toolbox"></i> Tools disponibles
+                                    </a>
+                                </div>
+                            </li>
+                            {% endif %}
                         </ul>
                     </div>
                 

@@ -1,0 +1,239 @@
+{% extends 'base.html.twig' %}
+
+{% block simplebody %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="fa-solid fa-key"></i> Clés API MCP</h1>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createModal">
+            <i class="fa-solid fa-plus"></i> Nouvelle clé
+        </button>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <th>Token (preview)</th>
+                            <th>Permissions</th>
+                            <th>Statut</th>
+                            <th>Dernière utilisation</th>
+                            <th>Créée le</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="keysTable">
+                        <tr>
+                            <td colspan="7" class="text-center text-muted">
+                                <i class="fa-solid fa-spinner fa-spin"></i> Chargement...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="alert alert-info mt-4">
+        <i class="fa-solid fa-info-circle"></i>
+        <strong>Comment utiliser les clés MCP :</strong>
+        <ul class="mb-0 mt-2">
+            <li>Copiez le token et configurez-le dans votre client MCP (Cursor, Claude Desktop, etc.)</li>
+            <li>Utilisez l'endpoint <code>POST /mcp</code> avec l'en-tête <code>Authorization: Bearer &lt;token&gt;</code></li>
+            <li>Voir les <a href="{{ path('mcp_tools') }}" target="_blank">tools disponibles</a></li>
+        </ul>
+    </div>
+</div>
+
+<div class="modal fade" id="createModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nouvelle clé API MCP</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Nom de la clé</label>
+                    <input type="text" class="form-control" id="keyName" placeholder="Ex: Claude Desktop, Cursor Workspace">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Permissions</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="permAll" checked>
+                        <label class="form-check-label" for="permAll">
+                            Toutes les permissions (*)
+                        </label>
+                    </div>
+                    <div id="permList" class="mt-2 ps-3" style="display:none;">
+                        {% set permissions = [
+                            'sites.list', 'sites.get',
+                            'audits.list', 'audits.get', 'audits.trigger',
+                            'pages.list', 'pages.get', 'pages.analyze', 'pages.ai_analyze',
+                            'ai.summary', 'ai.trigger'
+                        ] %}
+                        {% for perm in permissions %}
+                        <div class="form-check">
+                            <input class="form-check-input perm-item" type="checkbox" value="{{ perm }}" id="perm{{ loop.index }}">
+                            <label class="form-check-label" for="perm{{ loop.index }}">{{ perm }}</label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-primary" onclick="createKey()">
+                    <i class="fa-solid fa-key"></i> Générer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="tokenModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fa-solid fa-key"></i> Nouvelle clé créée</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fa-solid fa-exclamation-triangle"></i>
+                    <strong>Important :</strong> Copiez ce token maintenant. Il ne sera plus jamais affiché.
+                </div>
+                <div class="input-group">
+                    <input type="text" class="form-control font-monospace" id="newToken" readonly>
+                    <button class="btn btn-outline-secondary" onclick="copyToken()">
+                        <i class="fa-solid fa-copy"></i> Copier
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-success" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function loadKeys() {
+    const response = await fetch('{{ path('mcp_keys_list') }}');
+    const data = await response.json();
+    const tbody = document.getElementById('keysTable');
+    
+    if (data.keys.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Aucune clé API MCP</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = data.keys.map(key => `
+        <tr>
+            <td><strong>${escapeHtml(key.name)}</strong></td>
+            <td><code>${escapeHtml(key.tokenPrefix)}</code></td>
+            <td>
+                <span class="badge bg-secondary">${key.permissions.includes('*') ? '*' : key.permissions.length + ' permissions'}</span>
+            </td>
+            <td>
+                <span class="badge bg-${key.isActive ? 'success' : 'danger'}">${key.isActive ? 'Active' : 'Inactive'}</span>
+            </td>
+            <td>${key.lastUsedAt || '<span class="text-muted">Jamais</span>'}</td>
+            <td>${key.createdAt}</td>
+            <td>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary" onclick="regenerateKey(${key.id})" title="Régénérer le token">
+                        <i class="fa-solid fa-rotate"></i>
+                    </button>
+                    <button class="btn btn-outline-${key.isActive ? 'warning' : 'success'}" onclick="toggleKey(${key.id}, ${!key.isActive})" title="${key.isActive ? 'Désactiver' : 'Activer'}">
+                        <i class="fa-solid fa-${key.isActive ? 'ban' : 'check'}"></i>
+                    </button>
+                    <button class="btn btn-outline-danger" onclick="deleteKey(${key.id})" title="Supprimer">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+document.getElementById('permAll').addEventListener('change', function() {
+    document.getElementById('permList').style.display = this.checked ? 'none' : 'block';
+});
+
+async function createKey() {
+    const name = document.getElementById('keyName').value.trim();
+    if (!name) {
+        alert('Veuillez entrer un nom');
+        return;
+    }
+    
+    let permissions = ['*'];
+    if (!document.getElementById('permAll').checked) {
+        permissions = Array.from(document.querySelectorAll('.perm-item:checked')).map(el => el.value);
+    }
+    
+    const response = await fetch('{{ path('mcp_keys_create') }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name, permissions})
+    });
+    
+    const data = await response.json();
+    
+    if (data.token) {
+        document.getElementById('newToken').value = data.token;
+        bootstrap.Modal.getInstance(document.getElementById('createModal')).hide();
+        new bootstrap.Modal(document.getElementById('tokenModal')).show();
+        loadKeys();
+    } else {
+        alert('Erreur: ' + (data.error || 'Erreur inconnue'));
+    }
+}
+
+function copyToken() {
+    const input = document.getElementById('newToken');
+    navigator.clipboard.writeText(input.value);
+    input.select();
+}
+
+async function regenerateKey(id) {
+    if (!confirm('Régénérer le token ? L\'ancien ne fonctionnera plus.')) return;
+    
+    const response = await fetch('{{ path('mcp_keys_regenerate', {id: '__ID__'}) }}'.replace('__ID__', id), {method: 'POST'});
+    const data = await response.json();
+    
+    if (data.token) {
+        document.getElementById('newToken').value = data.token;
+        new bootstrap.Modal(document.getElementById('tokenModal')).show();
+        loadKeys();
+    }
+}
+
+async function toggleKey(id, activate) {
+    await fetch('{{ path('mcp_keys_update', {id: '__ID__'}) }}'.replace('__ID__', id), {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({isActive: activate})
+    });
+    loadKeys();
+}
+
+async function deleteKey(id) {
+    if (!confirm('Supprimer cette clé définitivement ?')) return;
+    
+    await fetch('{{ path('mcp_keys_delete', {id: '__ID__'}) }}'.replace('__ID__', id), {method: 'DELETE'});
+    loadKeys();
+}
+
+loadKeys();
+</script>
+{% endblock %}

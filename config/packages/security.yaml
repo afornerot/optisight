@@ -24,6 +24,11 @@ security:
       custom_authenticators:
         - App\Security\ApiKeyAuthenticator
 
+    mcp:
+      pattern: ^/mcp
+      stateless: true
+      security: false
+
     main:
       pattern: ^/
       provider: sql_provider
@@ -42,6 +47,7 @@ security:
   access_control:
     - { path: ^/login, roles: PUBLIC_ACCESS }
     - { path: ^/v1/api/doc, roles: PUBLIC_ACCESS }
+    - { path: ^/mcp, roles: PUBLIC_ACCESS }
     - { path: ^/v1/api, roles: ROLE_API }
     - { path: ^/admin, roles: ROLE_ADMIN }
     - { path: ^/, roles: ROLE_USER }
