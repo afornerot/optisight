@@ -65,31 +65,6 @@ class CasUserProvider implements UserProviderInterface
     }
 
     /**
-     * Charge un utilisateur par son identifiant CAS et autosubmit autoupdate en fonction des attributs CAS
-     */
-    public function loadUserByIdentifierAndOIDCAttributes(string $identifier, array $attributes): UserInterface
-    {
-        // Charger l'utilisateur existant depuis la base de données
-        $user = $this->userRepository->findOneBy(['username' => $identifier]);
-
-        if (!$user) {
-            // Créer un nouvel utilisateur avec les attributs CAS
-            $user = new User();
-            $user->setUsername($identifier);
-            $user->setPassword(Uuid::uuid4()->toString());
-            $user->setRoles(['ROLE_USER']);
-
-            // Persister l'utilisateur en base si nécessaire
-            $this->em->persist($user);
-        }
-
-        $user->setEmail($attributes[$this->parameterBag->get('oidcMailAttribute')] ?? null);
-        $this->em->flush();
-
-        return $user;
-    }
-
-    /**
      * Permet de recharger un utilisateur déjà authentifié (si nécessaire).
      */
     public function refreshUser(UserInterface $user): UserInterface
