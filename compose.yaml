@@ -38,3 +38,9 @@ services:
     restart: always
     ports:
       - 6027:8080
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 10.210.160.0/20
