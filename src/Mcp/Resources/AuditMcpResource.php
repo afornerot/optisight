@@ -86,10 +86,31 @@ class AuditMcpResource
         $this->em->persist($analysis);
         $this->em->flush();
 
+        // Lancer l analyse en arriere-plan DETACHE : sans cela l audit reste
+        // "pending" indefiniment, puisque le flux (et le moteur) ne demarre
+        // qu a l ouverture de la page de progression.
+        // Les fichiers pid/journal sont ceux de StreamCommandController : la
+        // page de progression peut donc se rattacher au process deja lance,
+        // et le bouton "Arret" (killProcessTree) reste operationnel.
+        $id = (int) $analysis->getId();
+        $console = dirname(__DIR__, 3) . '/bin/console';
+        $log = sys_get_temp_dir() . "/optisight_analysis_{$id}.log";
+        $pidFile = sys_get_temp_dir() . "/optisight_analysis_{$id}.pid";
+        @unlink($log);
+
+        exec(sprintf(
+            'nohup php %s app:rgaa %d >> %s 2>&1 < /dev/null & echo $! > %s',
+            escapeshellarg($console),
+            $id,
+            escapeshellarg($log),
+            escapeshellarg($pidFile)
+        ));
+
         return [
             'message' => 'Audit triggered successfully',
-            'auditId' => $analysis->getId(),
+            'auditId' => $id,
             'status' => $analysis->getStatus(),
+            'started' => true,
         ];
     }
 
