@@ -14,7 +14,7 @@ use Symfony\Component\Routing\Annotation\Route;
 
 use App\Service\ExcludeCleaner;
 
-#[Route('/audit')]
+#[\Symfony\Component\Routing\Attribute\Route('/audit')]
 class SiteController extends AbstractController
 {
     public function __construct(
@@ -23,7 +23,7 @@ class SiteController extends AbstractController
         private ExcludeCleaner $cleaner,
     ) {}
 
-    #[Route('', name: 'audit_index')]
+    #[\Symfony\Component\Routing\Attribute\Route('', name: 'audit_index')]
     public function index(): Response
     {
         $sites = $this->em->getRepository(Site::class)->findBy([], ['createdAt' => 'DESC']);
@@ -67,7 +67,7 @@ class SiteController extends AbstractController
         ]);
     }
 
-    #[Route('/new', name: 'audit_new', methods: ['GET', 'POST'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/new', name: 'audit_new', methods: ['GET', 'POST'])]
     public function new(Request $request): Response
     {
         if ($request->isMethod('POST')) {
@@ -94,7 +94,7 @@ class SiteController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}', name: 'audit_site')]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}', name: 'audit_site')]
     public function show(int $id): Response
     {
         $site = $this->em->getRepository(Site::class)->find($id);
@@ -141,7 +141,7 @@ class SiteController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/delete', name: 'audit_delete', methods: ['POST'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}/delete', name: 'audit_delete', methods: ['POST'])]
     public function delete(int $id): Response
     {
         $site = $this->em->getRepository(Site::class)->find($id);
@@ -153,7 +153,7 @@ class SiteController extends AbstractController
         return $this->redirectToRoute('audit_index');
     }
 
-    #[Route('/{id}/analyze', name: 'audit_analyze', methods: ['POST'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}/analyze', name: 'audit_analyze', methods: ['POST'])]
     public function analyze(int $id): Response
     {
         $site = $this->em->getRepository(Site::class)->find($id);
@@ -169,7 +169,7 @@ class SiteController extends AbstractController
         return $this->redirectToRoute('audit_analysis_progress', ['id' => $analysis->getId()]);
     }
 
-    #[Route('/{id}/crawl', name: 'audit_crawl_page')]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}/crawl', name: 'audit_crawl_page')]
     public function crawlPage(int $id): Response
     {
         $site = $this->em->getRepository(Site::class)->find($id);
@@ -183,7 +183,7 @@ class SiteController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/edit', name: 'audit_site_edit', methods: ['POST'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}/edit', name: 'audit_site_edit', methods: ['POST'])]
     public function edit(int $id, Request $request): Response
     {
         $site = $this->em->getRepository(Site::class)->find($id);
@@ -200,7 +200,7 @@ class SiteController extends AbstractController
         return $this->redirectToRoute('audit_site', ['id' => $id]);
     }
 
-    #[Route('/{id}/exclude', name: 'audit_exclude', methods: ['POST'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}/exclude', name: 'audit_exclude', methods: ['POST'])]
     public function exclude(int $id, Request $request): Response
     {
         $site = $this->em->getRepository(Site::class)->find($id);
@@ -215,7 +215,7 @@ class SiteController extends AbstractController
         return $this->redirectToRoute('audit_site', ['id' => $id]);
     }
 
-    #[Route('/{id}/exclude/clean', name: 'audit_exclude_clean', methods: ['POST'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}/exclude/clean', name: 'audit_exclude_clean', methods: ['POST'])]
     public function excludeClean(int $id): Response
     {
         $site = $this->em->getRepository(Site::class)->find($id);
@@ -234,7 +234,7 @@ class SiteController extends AbstractController
         return $this->redirectToRoute('audit_site', ['id' => $id]);
     }
 
-    #[Route('/{id}/auth', name: 'audit_auth')]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}/auth', name: 'audit_auth')]
     public function auth(int $id, Request $request): Response
     {
         $site = $this->em->getRepository(Site::class)->find($id);
@@ -279,7 +279,7 @@ class SiteController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/auth/login', name: 'audit_auth_login', methods: ['POST'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}/auth/login', name: 'audit_auth_login', methods: ['POST'])]
     public function authLogin(int $id): Response
     {
         $site = $this->em->getRepository(Site::class)->find($id);
@@ -305,7 +305,7 @@ class SiteController extends AbstractController
         return $this->redirectToRoute('audit_auth', ['id' => $id]);
     }
 
-    #[Route('/{id}/auth/test', name: 'audit_auth_test', methods: ['POST'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}/auth/test', name: 'audit_auth_test', methods: ['POST'])]
     public function testAuth(int $id): Response
     {
         $site = $this->em->getRepository(Site::class)->find($id);

@@ -1,4 +1,4 @@
-FROM reg.cadoles.com/envole/nineapache:8.4
+FROM reg.cadoles.com/envole/nineapache:8.5
 
 USER root
 

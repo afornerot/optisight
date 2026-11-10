@@ -6,6 +6,9 @@ use App\Entity\Site;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
+/**
+ * @extends \Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository<\App\Entity\Site>
+ */
 class SiteRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)

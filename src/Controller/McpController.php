@@ -17,7 +17,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 
-#[Route('/mcp')]
+#[\Symfony\Component\Routing\Attribute\Route('/mcp')]
 class McpController extends AbstractController
 {
     private McpServer $server;
@@ -231,7 +231,7 @@ class McpController extends AbstractController
         ]);
     }
 
-    #[Route('', name: 'mcp_handler', methods: ['POST'])]
+    #[\Symfony\Component\Routing\Attribute\Route('', name: 'mcp_handler', methods: ['POST'])]
     public function handle(Request $request): Response
     {
         $authHeader = $request->headers->get('Authorization', '');
@@ -249,7 +249,7 @@ class McpController extends AbstractController
         );
     }
 
-    #[Route('/tools', name: 'mcp_tools', methods: ['GET'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/tools', name: 'mcp_tools', methods: ['GET'])]
     public function tools(): Response
     {
         $result = $this->server->handleRequest([
@@ -261,7 +261,7 @@ class McpController extends AbstractController
         return new JsonResponse($result);
     }
 
-    #[Route('/initialize', name: 'mcp_initialize', methods: ['POST'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/initialize', name: 'mcp_initialize', methods: ['POST'])]
     public function initialize(Request $request): Response
     {
         $data = json_decode($request->getContent(), true);

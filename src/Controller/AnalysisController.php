@@ -17,7 +17,7 @@ use Symfony\Component\Routing\Annotation\Route;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 
-#[Route('/audit/analysis')]
+#[\Symfony\Component\Routing\Attribute\Route('/audit/analysis')]
 class AnalysisController extends AbstractController
 {
     public function __construct(
@@ -27,7 +27,7 @@ class AnalysisController extends AbstractController
         private Pa11yService $pa11y,
     ) {}
 
-    #[Route('/{id}', name: 'audit_analysis')]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}', name: 'audit_analysis')]
     public function show(int $id): Response
     {
         $analysis = $this->em->getRepository(Analysis::class)->find($id);
@@ -67,7 +67,7 @@ class AnalysisController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/progress', name: 'audit_analysis_progress')]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}/progress', name: 'audit_analysis_progress')]
     public function progress(int $id): Response
     {
         $analysis = $this->em->getRepository(Analysis::class)->find($id);
@@ -82,7 +82,7 @@ class AnalysisController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/ai', name: 'audit_analysis_ai')]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}/ai', name: 'audit_analysis_ai')]
     public function ai(int $id): Response
     {
         $analysis = $this->em->getRepository(Analysis::class)->find($id);
@@ -97,12 +97,12 @@ class AnalysisController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/status', name: 'audit_analysis_status', methods: ['GET'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}/status', name: 'audit_analysis_status', methods: ['GET'])]
     public function status(int $id): JsonResponse
     {
         $analysis = $this->em->getRepository(Analysis::class)->find($id);
         if (!$analysis) {
-            return new JsonResponse(['error' => 'Not found'], 404);
+            return new JsonResponse(['error' => 'Not found'], \Symfony\Component\HttpFoundation\Response::HTTP_NOT_FOUND);
         }
 
         $reportCount = $this->em->getRepository(PageReport::class)
@@ -124,16 +124,16 @@ class AnalysisController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/stop', name: 'audit_analysis_stop', methods: ['POST'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}/stop', name: 'audit_analysis_stop', methods: ['POST'])]
     public function stop(int $id): JsonResponse
     {
         $analysis = $this->em->getRepository(Analysis::class)->find($id);
         if (!$analysis) {
-            return new JsonResponse(['error' => 'Not found'], 404);
+            return new JsonResponse(['error' => 'Not found'], \Symfony\Component\HttpFoundation\Response::HTTP_NOT_FOUND);
         }
 
         if ($analysis->getStatus() !== Analysis::STATUS_RUNNING) {
-            return new JsonResponse(['error' => 'Not running'], 400);
+            return new JsonResponse(['error' => 'Not running'], \Symfony\Component\HttpFoundation\Response::HTTP_BAD_REQUEST);
         }
 
         $analysis->setStatus(Analysis::STATUS_CANCELLED);
@@ -144,7 +144,7 @@ class AnalysisController extends AbstractController
         return new JsonResponse(['ok' => true]);
     }
 
-    #[Route('/{id}/delete', name: 'audit_analysis_delete', methods: ['POST'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}/delete', name: 'audit_analysis_delete', methods: ['POST'])]
     public function delete(int $id): Response
     {
         $analysis = $this->em->getRepository(Analysis::class)->find($id);
@@ -160,7 +160,7 @@ class AnalysisController extends AbstractController
         return $this->redirectToRoute('audit_site', ['id' => $siteId]);
     }
 
-    #[Route('/{id}/pdf', name: 'audit_analysis_pdf', methods: ['GET'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}/pdf', name: 'audit_analysis_pdf', methods: ['GET'])]
     public function pdf(int $id): Response
     {
         $analysis = $this->em->getRepository(Analysis::class)->find($id);
@@ -215,7 +215,7 @@ class AnalysisController extends AbstractController
 
         return new Response(
             $dompdf->output(),
-            200,
+            \Symfony\Component\HttpFoundation\Response::HTTP_OK,
             [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => sprintf('inline; filename="%s"', $filename),
@@ -223,7 +223,7 @@ class AnalysisController extends AbstractController
         );
     }
 
-    #[Route('/{id}/markdown', name: 'audit_analysis_markdown', methods: ['GET'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}/markdown', name: 'audit_analysis_markdown', methods: ['GET'])]
     public function markdown(int $id): Response
     {
         $analysis = $this->em->getRepository(Analysis::class)->find($id);
@@ -344,7 +344,7 @@ class AnalysisController extends AbstractController
 
         return new Response(
             $md,
-            200,
+            \Symfony\Component\HttpFoundation\Response::HTTP_OK,
             [
                 'Content-Type' => 'text/markdown; charset=utf-8',
                 'Content-Disposition' => sprintf('attachment; filename="%s"', $filename),
@@ -393,7 +393,7 @@ class AnalysisController extends AbstractController
         return $text;
     }
 
-    #[Route('/{id}/page/{reportId}', name: 'audit_analysis_page', methods: ['GET'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}/page/{reportId}', name: 'audit_analysis_page', methods: ['GET'])]
     public function page(int $id, int $reportId): Response
     {
         $analysis = $this->em->getRepository(Analysis::class)->find($id);
@@ -414,7 +414,7 @@ class AnalysisController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/page/{reportId}/delete', name: 'audit_analysis_page_delete', methods: ['POST'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}/page/{reportId}/delete', name: 'audit_analysis_page_delete', methods: ['POST'])]
     public function pageDelete(int $id, int $reportId): Response
     {
         $analysis = $this->em->getRepository(Analysis::class)->find($id);
@@ -434,7 +434,7 @@ class AnalysisController extends AbstractController
         return $this->redirectToRoute('audit_analysis', ['id' => $id]);
     }
 
-    #[Route('/{id}/page/{reportId}/ai', name: 'audit_analysis_page_ai', methods: ['POST'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}/page/{reportId}/ai', name: 'audit_analysis_page_ai', methods: ['POST'])]
     public function pageAi(int $id, int $reportId): Response
     {
         $analysis = $this->em->getRepository(Analysis::class)->find($id);
@@ -471,14 +471,19 @@ class AnalysisController extends AbstractController
                     if (ob_get_level() > 0) { ob_flush(); }
                     flush();
 
-                    $result = $this->ai->analyzePageByIndicator($pageData, $indicator);
+                    try {
+                        $result = $this->ai->analyzePageByIndicator($pageData, $indicator);
 
-                    if ($result) {
-                        $results[$indicator] = $result;
-                        echo "DONE_" . strtoupper($indicator) . ":OK\n";
-                    } else {
-                        $results[$indicator] = ['analysis' => '', 'recommendations' => []];
-                        echo "DONE_" . strtoupper($indicator) . ":EMPTY\n";
+                        if ($result) {
+                            $results[$indicator] = $result;
+                            echo "DONE_" . strtoupper($indicator) . ":OK\n";
+                        } else {
+                            $results[$indicator] = ['summary' => '', 'recommendations' => []];
+                            echo "DONE_" . strtoupper($indicator) . ":EMPTY\n";
+                        }
+                    } catch (\Throwable $e) {
+                        $results[$indicator] = ['summary' => '', 'recommendations' => []];
+                        echo "DONE_" . strtoupper($indicator) . ":ERROR:" . substr($e->getMessage(), 0, 100) . "\n";
                     }
 
                     if (ob_get_level() > 0) { ob_flush(); }
@@ -494,10 +499,11 @@ class AnalysisController extends AbstractController
                 echo "DONE:Analyse IA terminée (5 indicateurs).\n";
                 if (ob_get_level() > 0) { ob_flush(); }
                 flush();
-            }, 200, [
+                usleep(500000);
+            }, \Symfony\Component\HttpFoundation\Response::HTTP_OK, [
                 'Content-Type' => 'text/plain; charset=utf-8',
                 'X-Accel-Buffering' => 'no',
-                'Cache-Control' => 'no-cache',
+                'Cache-Control' => 'no-cache, no-store, must-revalidate',
             ]);
         }
 
@@ -515,7 +521,7 @@ class AnalysisController extends AbstractController
         return $this->redirectToRoute('audit_analysis_page', ['id' => $id, 'reportId' => $reportId]);
     }
 
-    #[Route('/{id}/page/{reportId}/reanalyze', name: 'audit_analysis_page_reanalyze', methods: ['POST'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}/page/{reportId}/reanalyze', name: 'audit_analysis_page_reanalyze', methods: ['POST'])]
     public function pageReanalyze(int $id, int $reportId): Response
     {
         $analysis = $this->em->getRepository(Analysis::class)->find($id);
@@ -588,7 +594,7 @@ class AnalysisController extends AbstractController
                 echo "DONE:Analyse terminée. Les scores et rapports ont été mis à jour.\n";
                 if (ob_get_level() > 0) { ob_flush(); }
                 flush();
-            }, 200, [
+            }, \Symfony\Component\HttpFoundation\Response::HTTP_OK, [
                 'Content-Type' => 'text/plain; charset=utf-8',
                 'X-Accel-Buffering' => 'no',
                 'Cache-Control' => 'no-cache',

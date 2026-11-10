@@ -107,7 +107,7 @@
                                         </h6>
                                     </div>
                                     <div class="card-body p-2" style="font-size: 0.88em;">
-                                        {% if data and data.summary is not empty %}
+                                        {% if data.summary is defined and data.summary is not empty %}
                                             <p class="mb-2">{{ data.summary }}</p>
                                             {% if data.recommendations is defined and data.recommendations is not empty %}
                                                 {% set priorityColors = {'HIGH': 'danger', 'MEDIUM': 'warning', 'LOW': 'info'} %}
@@ -291,6 +291,16 @@ function launchAiAnalysis() {
         if (line.startsWith('STEP:')) {
             return '<div class="text-warning"><span class="spinner-border spinner-border-sm"></span> ' + esc(line.substring(5)) + '</div>';
         }
+        if (line.startsWith('DONE_PERFORMANCE:') || line.startsWith('DONE_ACCESSIBILITE:') || line.startsWith('DONE_SEO:') || line.startsWith('DONE_BONNES_PRATIQUES:') || line.startsWith('DONE_RGAA:')) {
+            if (line.includes(':ERROR:')) {
+                const parts = line.split(':ERROR:');
+                return '<div class="text-danger fw-bold"><i class="fa-solid fa-xmark-circle"></i> ' + esc(parts[0].substring(5)) + ' : Erreur' + (parts[1] ? ' - ' + esc(parts[1]) : '') + '</div>';
+            }
+            if (line.includes(':EMPTY')) {
+                return '<div class="text-muted"><i class="fa-solid fa-circle-minus"></i> ' + esc(line.substring(5)) + ' : Vide</div>';
+            }
+            return '<div class="text-success fw-bold"><i class="fa-solid fa-check-circle"></i> ' + esc(line.substring(5)) + ' : OK</div>';
+        }
         if (line.startsWith('DONE_LH:')) {
             return '<div class="text-info fw-bold"><i class="fa-solid fa-check-circle"></i> Lighthouse : ' + esc(line.substring(8)) + '</div>';
         }
@@ -314,18 +324,25 @@ function launchAiAnalysis() {
 
     (async function() {
         try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 300000);
+
             const response = await fetch('{{ path("audit_analysis_page_ai", {id: analysis.id, reportId: report.id}) }}', {
                 method: 'POST',
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
+
             if (!response.ok) {
-                consoleEl.innerHTML += '<div class="text-danger">Erreur HTTP ' + response.status + '</div>';
+                consoleEl.innerHTML += '<div class="text-danger fw-bold">Erreur HTTP ' + response.status + ' ' + response.statusText + '</div>';
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Relancer l\'analyse IA';
                 return;
             }
             if (!response.body) {
-                consoleEl.innerHTML += '<div class="text-danger">Streaming non supporté.</div>';
+                consoleEl.innerHTML += '<div class="text-danger">Streaming non supporté par votre navigateur.</div>';
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Relancer l\'analyse IA';
                 return;
@@ -333,28 +350,69 @@ function launchAiAnalysis() {
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';
+            let doneCount = 0;
+            let stepCount = 0;
+            const expectedSteps = 5;
+            const expectedDones = 5;
+            let completed = false;
+            let allStepsStarted = false;
 
             while (true) {
                 const { value, done } = await reader.read();
                 if (done) break;
                 buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop();
-                for (const line of lines) {
-                    if (line.trim()) {
-                        consoleEl.innerHTML += parseLine(line);
-                        consoleEl.scrollTop = consoleEl.scrollHeight;
+                while (buffer.includes('\n')) {
+                    const nlIndex = buffer.indexOf('\n');
+                    const line = buffer.substring(0, nlIndex).trim();
+                    buffer = buffer.substring(nlIndex + 1);
+                    if (!line) continue;
+                    if (line.startsWith('STEP:')) {
+                        stepCount++;
+                        allStepsStarted = true;
                     }
+                    if (line.startsWith('DONE_')) {
+                        doneCount++;
+                    }
+                    if (line.startsWith('DONE:')) {
+                        completed = true;
+                    }
+                    consoleEl.innerHTML += parseLine(line);
+                    consoleEl.scrollTop = consoleEl.scrollHeight;
                 }
             }
             if (buffer.trim()) {
-                consoleEl.innerHTML += parseLine(buffer);
+                const line = buffer.trim();
+                if (line.startsWith('STEP:')) {
+                    stepCount++;
+                    allStepsStarted = true;
+                }
+                if (line.startsWith('DONE_')) {
+                    doneCount++;
+                }
+                if (line.startsWith('DONE:')) {
+                    completed = true;
+                }
+                consoleEl.innerHTML += parseLine(line);
                 consoleEl.scrollTop = consoleEl.scrollHeight;
             }
 
-            setTimeout(() => { location.reload(); }, 1000);
+            if (completed || (doneCount >= expectedDones && stepCount >= expectedSteps)) {
+                setTimeout(() => { location.reload(); }, 1500);
+            } else if (doneCount > 0) {
+                consoleEl.innerHTML += '<div class="text-warning fw-bold mt-2">Analyse incomplète (' + doneCount + '/' + expectedDones + ' indicateurs terminés). Veuillez rafraîchir la page ou réessayer.</div>';
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Relancer l\'analyse IA';
+            } else {
+                consoleEl.innerHTML += '<div class="text-danger fw-bold mt-2">Erreur lors de l\'analyse. Veuillez réessayer.</div>';
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Relancer l\'analyse IA';
+            }
         } catch (error) {
-            consoleEl.innerHTML += '<div class="text-danger fw-bold">Erreur : ' + esc(error.message) + '</div>';
+            if (error.name === 'AbortError') {
+                consoleEl.innerHTML += '<div class="text-danger fw-bold">Erreur : Délai d\'attente dépassé (5 minutes). L\'analyse est trop longue.</div>';
+            } else {
+                consoleEl.innerHTML += '<div class="text-danger fw-bold">Erreur : ' + esc(error.message) + '</div>';
+            }
             btn.disabled = false;
             btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Relancer l\'analyse IA';
         }

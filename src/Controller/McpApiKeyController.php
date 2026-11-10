@@ -11,7 +11,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 
-#[Route('/admin/mcp/keys')]
+#[\Symfony\Component\Routing\Attribute\Route('/admin/mcp/keys')]
 class McpApiKeyController extends AbstractController
 {
     private EntityManagerInterface $em;
@@ -23,13 +23,13 @@ class McpApiKeyController extends AbstractController
         $this->repository = $repository;
     }
 
-    #[Route('', name: 'mcp_keys_page', methods: ['GET'])]
+    #[\Symfony\Component\Routing\Attribute\Route('', name: 'mcp_keys_page', methods: ['GET'])]
     public function page(): Response
     {
         return $this->render('mcp/keys.html.twig', ['usemenu' => true]);
     }
 
-    #[Route('/list', name: 'mcp_keys_list', methods: ['GET'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/list', name: 'mcp_keys_list', methods: ['GET'])]
     public function list(): Response
     {
         $keys = $this->repository->findBy([], ['createdAt' => 'DESC']);
@@ -50,7 +50,7 @@ class McpApiKeyController extends AbstractController
         return $this->json(['keys' => $data]);
     }
 
-    #[Route('/create', name: 'mcp_keys_create', methods: ['POST'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/create', name: 'mcp_keys_create', methods: ['POST'])]
     public function create(Request $request): Response
     {
         $data = json_decode($request->getContent(), true);
@@ -79,7 +79,7 @@ class McpApiKeyController extends AbstractController
         ], 201);
     }
 
-    #[Route('/{id}', name: 'mcp_keys_get', methods: ['GET'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}', name: 'mcp_keys_get', methods: ['GET'])]
     public function get(int $id): Response
     {
         $key = $this->repository->find($id);
@@ -98,7 +98,7 @@ class McpApiKeyController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}', name: 'mcp_keys_update', methods: ['PUT', 'PATCH'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}', name: 'mcp_keys_update', methods: ['PUT', 'PATCH'])]
     public function update(int $id, Request $request): Response
     {
         $key = $this->repository->find($id);
@@ -124,7 +124,7 @@ class McpApiKeyController extends AbstractController
         return $this->json(['message' => 'Updated successfully']);
     }
 
-    #[Route('/{id}', name: 'mcp_keys_delete', methods: ['DELETE'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}', name: 'mcp_keys_delete', methods: ['DELETE'])]
     public function delete(int $id): Response
     {
         $key = $this->repository->find($id);
@@ -139,7 +139,7 @@ class McpApiKeyController extends AbstractController
         return $this->json(['message' => 'Deleted successfully']);
     }
 
-    #[Route('/{id}/regenerate', name: 'mcp_keys_regenerate', methods: ['POST'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/{id}/regenerate', name: 'mcp_keys_regenerate', methods: ['POST'])]
     public function regenerate(int $id): Response
     {
         $key = $this->repository->find($id);

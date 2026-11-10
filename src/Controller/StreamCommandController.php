@@ -13,7 +13,7 @@ use Symfony\Component\HttpKernel\KernelInterface;
 use Symfony\Component\Process\Process;
 use Symfony\Component\Routing\Annotation\Route;
 
-#[Route('/audit/stream')]
+#[\Symfony\Component\Routing\Attribute\Route('/audit/stream')]
 class StreamCommandController extends AbstractController
 {
     public function __construct(
@@ -21,40 +21,40 @@ class StreamCommandController extends AbstractController
         private KernelInterface $kernel,
     ) {}
 
-    #[Route('/crawl/{id}', name: 'audit_stream_crawl', methods: ['GET'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/crawl/{id}', name: 'audit_stream_crawl', methods: ['GET'])]
     public function streamCrawl(int $id): StreamedResponse
     {
         $site = $this->em->getRepository(Site::class)->find($id);
         if (!$site) {
-            return new Response('Site not found', 404);
+            return new Response('Site not found', \Symfony\Component\HttpFoundation\Response::HTTP_NOT_FOUND);
         }
 
         return $this->streamCommand('app:crawl', ['site_id' => $id], 'crawl', $id);
     }
 
-    #[Route('/rgaa/{id}', name: 'audit_stream_rgaa', methods: ['GET'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/rgaa/{id}', name: 'audit_stream_rgaa', methods: ['GET'])]
     public function streamRgaa(int $id): StreamedResponse
     {
         $analysis = $this->em->getRepository(Analysis::class)->find($id);
         if (!$analysis) {
-            return new Response('Analysis not found', 404);
+            return new Response('Analysis not found', \Symfony\Component\HttpFoundation\Response::HTTP_NOT_FOUND);
         }
 
         return $this->streamCommand('app:rgaa', ['analysis_id' => $id], 'analysis', $id);
     }
 
-    #[Route('/ai/{id}', name: 'audit_stream_ai', methods: ['GET'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/ai/{id}', name: 'audit_stream_ai', methods: ['GET'])]
     public function streamAi(int $id): StreamedResponse
     {
         $analysis = $this->em->getRepository(Analysis::class)->find($id);
         if (!$analysis) {
-            return new Response('Analysis not found', 404);
+            return new Response('Analysis not found', \Symfony\Component\HttpFoundation\Response::HTTP_NOT_FOUND);
         }
 
         return $this->streamCommand('app:ai', ['analysis_id' => $id], 'analysis', $id);
     }
 
-    #[Route('/stop/{type}/{id}', name: 'audit_stream_stop', methods: ['POST'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/stop/{type}/{id}', name: 'audit_stream_stop', methods: ['POST'])]
     public function stop(string $type, int $id): JsonResponse
     {
         $pidFile = $this->getPidFile($type, $id);

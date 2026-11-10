@@ -14,7 +14,7 @@ use Symfony\Component\Routing\Annotation\Route;
 
 use App\Service\ExcludeCleaner;
 
-#[Route('/audit/{id}/crawl')]
+#[\Symfony\Component\Routing\Attribute\Route('/audit/{id}/crawl')]
 class CrawlManageController extends AbstractController
 {
     public function __construct(
@@ -22,7 +22,7 @@ class CrawlManageController extends AbstractController
         private ExcludeCleaner $cleaner,
     ) {}
 
-    #[Route('/manage', name: 'audit_crawl_manage', methods: ['GET'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/manage', name: 'audit_crawl_manage', methods: ['GET'])]
     public function manage(int $id): Response
     {
         $site = $this->em->getRepository(Site::class)->find($id);
@@ -39,7 +39,7 @@ class CrawlManageController extends AbstractController
         ]);
     }
 
-    #[Route('/manage/add', name: 'audit_crawl_manage_add', methods: ['POST'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/manage/add', name: 'audit_crawl_manage_add', methods: ['POST'])]
     public function addPage(int $id, Request $request): Response
     {
         $site = $this->em->getRepository(Site::class)->find($id);
@@ -80,7 +80,7 @@ class CrawlManageController extends AbstractController
         return $this->redirectToRoute('audit_crawl_manage', ['id' => $id]);
     }
 
-    #[Route('/manage/edit/{index}', name: 'audit_crawl_manage_edit', methods: ['POST'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/manage/edit/{index}', name: 'audit_crawl_manage_edit', methods: ['POST'])]
     public function editPage(int $id, int $index, Request $request): Response
     {
         $site = $this->em->getRepository(Site::class)->find($id);
@@ -117,7 +117,7 @@ class CrawlManageController extends AbstractController
         return $this->redirectToRoute('audit_crawl_manage', ['id' => $id]);
     }
 
-    #[Route('/manage/delete/{index}', name: 'audit_crawl_manage_delete', methods: ['POST'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/manage/delete/{index}', name: 'audit_crawl_manage_delete', methods: ['POST'])]
     public function deletePage(int $id, int $index): Response
     {
         $site = $this->em->getRepository(Site::class)->find($id);
@@ -143,7 +143,7 @@ class CrawlManageController extends AbstractController
         return $this->redirectToRoute('audit_crawl_manage', ['id' => $id]);
     }
 
-    #[Route('/manage/delete-excluded', name: 'audit_crawl_manage_delete_excluded', methods: ['POST'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/manage/delete-excluded', name: 'audit_crawl_manage_delete_excluded', methods: ['POST'])]
     public function deleteExcluded(int $id): Response
     {
         $site = $this->em->getRepository(Site::class)->find($id);

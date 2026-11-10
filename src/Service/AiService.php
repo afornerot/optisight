@@ -380,92 +380,113 @@ PROMPT;
         return $prompt;
     }
 
-    // ── Shared LLM call ──
+    // ── Shared LLM call with retry ──
 
     private function callLlm(string $prompt, string $systemMessage, int $maxTokens): ?array
     {
         $this->logger->info('AI LLM call starting', ['prompt_length' => mb_strlen($prompt), 'max_tokens' => $maxTokens]);
 
-        try {
-            $response = $this->http->request('POST', $this->baseUrl . '/chat/completions', [
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                    'Authorization' => 'Bearer ' . $this->apiKey,
-                ],
-                'json' => [
-                    'model' => $this->model,
-                    'messages' => [
-                        ['role' => 'system', 'content' => $systemMessage],
-                        ['role' => 'user', 'content' => $prompt],
+        $maxRetries = 3;
+        $retryDelay = 2000000;
+        $timeout = 180;
+
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            try {
+                $response = $this->http->request('POST', $this->baseUrl . '/chat/completions', [
+                    'headers' => [
+                        'Content-Type' => 'application/json',
+                        'Authorization' => 'Bearer ' . $this->apiKey,
                     ],
-                    'temperature' => 0.2,
-                    'max_tokens' => $maxTokens,
-                ],
-                'timeout' => 120,
-            ]);
-
-            $this->logger->info('AI HTTP request completed');
-
-            $data = $response->toArray(false);
-            $content = $data['choices'][0]['message']['content'] ?? null;
-
-            if (!$content) {
-                return null;
-            }
-
-            $content = trim($content);
-
-            $this->logger->info('AI response received', [
-                'length' => mb_strlen($content),
-            ]);
-
-            if (str_starts_with($content, '```')) {
-                $content = preg_replace('/^```(?:json)?\s*/', '', $content);
-                $content = preg_replace('/\s*```$/', '', $content);
-            }
-
-            $result = json_decode($content, true);
-
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                $this->logger->warning('AI JSON parse failed, trying regex fallback', [
-                    'json_error' => json_last_error_msg(),
+                    'json' => [
+                        'model' => $this->model,
+                        'messages' => [
+                            ['role' => 'system', 'content' => $systemMessage],
+                            ['role' => 'user', 'content' => $prompt],
+                        ],
+                        'temperature' => 0.2,
+                        'max_tokens' => $maxTokens,
+                    ],
+                    'timeout' => $timeout,
                 ]);
-                if (preg_match('/\{[\s\S]*\}/', $content, $matches)) {
-                    $result = json_decode($matches[0], true);
-                }
-            }
 
-            if (!is_array($result)) {
-                $this->logger->warning('AI result is not an array', ['result_type' => gettype($result)]);
+                $this->logger->info('AI HTTP request completed', ['attempt' => $attempt]);
+
+                $data = $response->toArray(false);
+                $content = $data['choices'][0]['message']['content'] ?? null;
+
+                if (!$content) {
+                    $this->logger->warning('AI response content is empty');
+                    return null;
+                }
+
+                $content = trim($content);
+
+                $this->logger->info('AI response received', [
+                    'length' => mb_strlen($content),
+                ]);
+
+                if (str_starts_with($content, '```')) {
+                    $content = preg_replace('/^```(?:json)?\s*/', '', $content);
+                    $content = preg_replace('/\s*```$/', '', $content);
+                }
+
+                $result = json_decode($content, true);
+
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    $this->logger->warning('AI JSON parse failed, trying regex fallback', [
+                        'json_error' => json_last_error_msg(),
+                    ]);
+                    if (preg_match('/\{[\s\S]*\}/', $content, $matches)) {
+                        $result = json_decode($matches[0], true);
+                    }
+                }
+
+                if (!is_array($result)) {
+                    $this->logger->warning('AI result is not an array', ['result_type' => gettype($result)]);
+                    return null;
+                }
+
+                $this->logger->info('AI LLM call successful');
+
+                if (isset($result['summary'])) {
+                    $result['summary'] = $this->normalizeSummary($result['summary']);
+                }
+
+                if (isset($result['recommendations']) && is_array($result['recommendations'])) {
+                    foreach ($result['recommendations'] as &$rec) {
+                        if (!isset($rec['pages']) || !is_array($rec['pages'])) {
+                            $rec['pages'] = [];
+                        }
+                        if (!isset($rec['elements']) || !is_array($rec['elements'])) {
+                            $rec['elements'] = [];
+                        }
+                        if (isset($rec['details']) && is_array($rec['details'])) {
+                            $rec['details'] = $this->formatDetails($rec['details']);
+                        }
+                    }
+                    unset($rec);
+                }
+
+                return $result;
+            } catch (\Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface $e) {
+                $this->logger->error('AI call failed (attempt ' . $attempt . ')', [
+                    'error' => $e->getMessage(),
+                    'exception_class' => get_class($e),
+                ]);
+                if ($attempt < $maxRetries) {
+                    $this->logger->info('Retrying in ' . ($retryDelay / 1000) . ' seconds...');
+                    usleep($retryDelay);
+                    $retryDelay *= 2;
+                } else {
+                    return null;
+                }
+            } catch (\Exception $e) {
+                $this->logger->error('AI call failed', ['error' => $e->getMessage(), 'exception_class' => get_class($e)]);
                 return null;
             }
-
-            $this->logger->info('AI LLM call successful');
-
-            if (isset($result['summary'])) {
-                $result['summary'] = $this->normalizeSummary($result['summary']);
-            }
-
-            if (isset($result['recommendations']) && is_array($result['recommendations'])) {
-                foreach ($result['recommendations'] as &$rec) {
-                    if (!isset($rec['pages']) || !is_array($rec['pages'])) {
-                        $rec['pages'] = [];
-                    }
-                    if (!isset($rec['elements']) || !is_array($rec['elements'])) {
-                        $rec['elements'] = [];
-                    }
-                    if (isset($rec['details']) && is_array($rec['details'])) {
-                        $rec['details'] = $this->formatDetails($rec['details']);
-                    }
-                }
-                unset($rec);
-            }
-
-            return $result;
-        } catch (\Exception $e) {
-            $this->logger->error('AI call failed', ['error' => $e->getMessage(), 'exception_class' => get_class($e)]);
-            return null;
         }
+
+        return null;
     }
 
     // ── Helpers ──

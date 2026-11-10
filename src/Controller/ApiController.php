@@ -13,14 +13,14 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Annotation\Route;
 
-#[Route('/v1/api')]
+#[\Symfony\Component\Routing\Attribute\Route('/v1/api')]
 class ApiController extends AbstractController
 {
     public function __construct(
         private EntityManagerInterface $em,
     ) {}
 
-    #[Route('', name: 'api_index', methods: ['GET'])]
+    #[\Symfony\Component\Routing\Attribute\Route('', name: 'api_index', methods: ['GET'])]
     #[ApiDoc\Area(['default'])]
     public function index(): JsonResponse
     {
@@ -34,7 +34,7 @@ class ApiController extends AbstractController
         ]);
     }
 
-    #[Route('/audit', name: 'api_audit', methods: ['GET'])]
+    #[\Symfony\Component\Routing\Attribute\Route('/audit', name: 'api_audit', methods: ['GET'])]
     #[ApiDoc\Area(['default'])]
     #[OA\Tag(name: 'Audit')]
     public function audit(): JsonResponse
