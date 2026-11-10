@@ -135,10 +135,12 @@ class StreamCommandController extends AbstractController
             // Lecture depuis le debut du fichier : un reload retrouve tout ce
             // qui a deja ete produit, puis suit en temps reel.
             $fh = @fopen($logFile, 'rb');
+            $lastData = time();
             while (true) {
                 $chunk = $fh ? fread($fh, 8192) : '';
                 if (is_string($chunk) && '' !== $chunk) {
                     echo $chunk;
+                    $lastData = time();
                     if (ob_get_level() > 0) {
                         ob_flush();
                     }
@@ -161,6 +163,20 @@ class StreamCommandController extends AbstractController
                         flush();
                     }
                     break;
+                }
+
+                // Battement de coeur : un appel LLM peut rester silencieux
+                // bien plus de 30 s, et Chrome coupe une requete sans aucune
+                // donnee apres 30 s ("Error in input stream"). Une ligne vide
+                // est ignoree par le lecteur (renderBuffer saute les lignes
+                // blanches) mais reset le compteur d inactivite du navigateur.
+                if (time() - $lastData >= 10) {
+                    echo "\n";
+                    if (ob_get_level() > 0) {
+                        ob_flush();
+                    }
+                    flush();
+                    $lastData = time();
                 }
 
                 usleep(100000);

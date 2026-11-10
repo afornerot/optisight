@@ -54,6 +54,13 @@ class RgaaCommand extends Command
             return Command::FAILURE;
         }
 
+        // Un relancement repart de zero : sans cette purge, chaque run
+        // ajoute ses rapports et la page de resultats affiche les memes
+        // pages en double (171 lignes pour 69 URL apres trois lancements).
+        $this->em->createQuery('DELETE FROM App\Entity\PageReport p WHERE p.analysis = :analysis')
+            ->setParameter('analysis', $analysis)
+            ->execute();
+
         $analysis->setStatus(Analysis::STATUS_RUNNING);
         $analysis->setStartedAt(new \DateTimeImmutable());
         $analysis->setTotalPages(count($crawlMetadata));
