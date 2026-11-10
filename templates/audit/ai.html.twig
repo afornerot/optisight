@@ -105,10 +105,20 @@
         buffer = lines.pop();
         let html = '';
         for (const line of lines) {
-            if (line.trim()) html += parseLine(line);
+            if (!line.trim()) continue;
+            // Re-attach : le journal est rejoue depuis le debut, on saute
+            // les lignes deja affichees pour ne pas les dupliquer.
+            if (skipRemaining > 0) {
+                skipRemaining--;
+                continue;
+            }
+            html += parseLine(line);
+            renderedCount++;
         }
-        consoleEl.innerHTML += html;
-        consoleEl.scrollTop = consoleEl.scrollHeight;
+        if (html) {
+            consoleEl.innerHTML += html;
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
     }
 
     function setStatus(label, color) {
@@ -126,45 +136,65 @@
         consoleEl.scrollTop = consoleEl.scrollHeight;
     }
 
-    (async function() {
-        try {
-            setStatus('Synthèse IA en cours...', 'warning');
-            const response = await fetch('{{ path("audit_stream_ai", {id: analysis.id}) }}');
+    // Nombre de lignes deja affichees : le re-attach rejoue le journal
+    // depuis le debut, on ignore donc ce qui est deja en place.
+    let renderedCount = 0;
+    let skipRemaining = 0;
 
-            if (!response.ok) {
-                consoleEl.innerHTML += '<div class="text-danger">Erreur HTTP ' + response.status + '</div>';
-                setStatus('Erreur', 'danger');
+    async function runStream() {
+        const MAX_RETRIES = 30;
+        let retries = 0;
+
+        setStatus('Synthèse IA en cours...', 'warning');
+
+        while (true) {
+            try {
+                const response = await fetch('{{ path("audit_stream_ai", {id: analysis.id}) }}');
+
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+
+                if (!response.body) {
+                    consoleEl.innerHTML += '<div class="text-danger">Streaming non supporté.</div>';
+                    return;
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    buffer = decoder.decode(value, { stream: true }) + buffer;
+                    renderBuffer();
+                }
+
+                if (buffer.trim()) {
+                    consoleEl.innerHTML += parseLine(buffer);
+                    buffer = '';
+                }
+
+                setStatus('Terminé', 'success');
+                showEndButtons();
                 return;
-            }
+            } catch (error) {
+                retries++;
+                if (retries > MAX_RETRIES) {
+                    consoleEl.innerHTML += '<div class="text-danger fw-bold">Erreur : ' + esc(error.message) + '</div>';
+                    setStatus('Erreur', 'danger');
+                    return;
+                }
 
-            if (!response.body) {
-                consoleEl.innerHTML += '<div class="text-danger">Streaming non supporté.</div>';
-                return;
-            }
-
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-
-            while (true) {
-                const { value, done } = await reader.read();
-                if (done) break;
-                buffer += decoder.decode(value, { stream: true });
-                renderBuffer();
-            }
-
-            if (buffer.trim()) {
-                consoleEl.innerHTML += parseLine(buffer);
+                // Reconnexion silencieuse : le travail continue cote serveur.
+                skipRemaining = renderedCount;
                 buffer = '';
+                await new Promise(r => setTimeout(r, 2000));
             }
-
-            setStatus('Terminé', 'success');
-            showEndButtons();
-
-        } catch (error) {
-            consoleEl.innerHTML += '<div class="text-danger fw-bold">Erreur : ' + esc(error.message) + '</div>';
-            setStatus('Erreur', 'danger');
         }
-    })();
+    }
+
+    runStream();
 })();
 </script>
 {% endblock %}
