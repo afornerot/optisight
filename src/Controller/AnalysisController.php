@@ -13,6 +13,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 use Dompdf\Dompdf;
 use Dompdf\Options;
@@ -435,7 +436,7 @@ class AnalysisController extends AbstractController
     }
 
     #[\Symfony\Component\Routing\Attribute\Route('/{id}/page/{reportId}/ai', name: 'audit_analysis_page_ai', methods: ['POST'])]
-    public function pageAi(int $id, int $reportId): Response
+    public function pageAi(int $id, int $reportId, Request $request): Response
     {
         $analysis = $this->em->getRepository(Analysis::class)->find($id);
         if (!$analysis) {
@@ -450,6 +451,16 @@ class AnalysisController extends AbstractController
         $isXhr = $this->container->get('request_stack')->getCurrentRequest()->headers->get('X-Requested-With') === 'XMLHttpRequest';
 
         if ($isXhr) {
+            // "Relancer" : on efface les indicateurs deja sauvegardes pour
+            // que la boucle parte de zero. Sans force, une reconnexion
+            // reprend la ou l on en etait (chaque indicateur termine est
+            // enregistre plus bas).
+            if ($request->query->has('force')) {
+                $report->setAiAnalysis(null);
+                $report->setAiAnalysisAt(null);
+                $this->em->flush();
+            }
+
             $pageData = $this->buildPageData($report);
 
             return new StreamedResponse(function () use ($pageData, $report) {

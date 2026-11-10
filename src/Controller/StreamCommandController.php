@@ -9,6 +9,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\KernelInterface;
 use Symfony\Component\Routing\Annotation\Route;
 
@@ -21,36 +22,36 @@ class StreamCommandController extends AbstractController
     ) {}
 
     #[\Symfony\Component\Routing\Attribute\Route('/crawl/{id}', name: 'audit_stream_crawl', methods: ['GET'])]
-    public function streamCrawl(int $id): StreamedResponse
+    public function streamCrawl(int $id, Request $request): StreamedResponse
     {
         $site = $this->em->getRepository(Site::class)->find($id);
         if (!$site) {
             return new Response('Site not found', \Symfony\Component\HttpFoundation\Response::HTTP_NOT_FOUND);
         }
 
-        return $this->streamCommand('app:crawl', ['site_id' => $id], 'crawl', $id);
+        return $this->streamCommand('app:crawl', ['site_id' => $id], 'crawl', $id, $request->query->has('force'));
     }
 
     #[\Symfony\Component\Routing\Attribute\Route('/rgaa/{id}', name: 'audit_stream_rgaa', methods: ['GET'])]
-    public function streamRgaa(int $id): StreamedResponse
+    public function streamRgaa(int $id, Request $request): StreamedResponse
     {
         $analysis = $this->em->getRepository(Analysis::class)->find($id);
         if (!$analysis) {
             return new Response('Analysis not found', \Symfony\Component\HttpFoundation\Response::HTTP_NOT_FOUND);
         }
 
-        return $this->streamCommand('app:rgaa', ['analysis_id' => $id], 'analysis', $id);
+        return $this->streamCommand('app:rgaa', ['analysis_id' => $id], 'analysis', $id, $request->query->has('force'));
     }
 
     #[\Symfony\Component\Routing\Attribute\Route('/ai/{id}', name: 'audit_stream_ai', methods: ['GET'])]
-    public function streamAi(int $id): StreamedResponse
+    public function streamAi(int $id, Request $request): StreamedResponse
     {
         $analysis = $this->em->getRepository(Analysis::class)->find($id);
         if (!$analysis) {
             return new Response('Analysis not found', \Symfony\Component\HttpFoundation\Response::HTTP_NOT_FOUND);
         }
 
-        return $this->streamCommand('app:ai', ['analysis_id' => $id], 'analysis', $id);
+        return $this->streamCommand('app:ai', ['analysis_id' => $id], 'analysis', $id, $request->query->has('force'));
     }
 
     #[\Symfony\Component\Routing\Attribute\Route('/stop/{type}/{id}', name: 'audit_stream_stop', methods: ['POST'])]
@@ -93,13 +94,13 @@ class StreamCommandController extends AbstractController
         exec("kill -9 {$pid} 2>/dev/null");
     }
 
-    private function streamCommand(string $command, array $arguments, string $type, int $id): StreamedResponse
+    private function streamCommand(string $command, array $arguments, string $type, int $id, bool $force = false): StreamedResponse
     {
         $consolePath = $this->kernel->getProjectDir() . '/bin/console';
         $pidFile = $this->getPidFile($type, $id);
         $logFile = $this->getLogFile($type, $id);
 
-        $response = new StreamedResponse(function () use ($consolePath, $command, $arguments, $pidFile, $logFile) {
+        $response = new StreamedResponse(function () use ($consolePath, $command, $arguments, $pidFile, $logFile, $force) {
             // Flux long : aucune limite de temps (voir history, php.ini = 30 s).
             set_time_limit(0);
             // Le client peut partir sans tuer l analyse : on le detecte et on
@@ -117,6 +118,19 @@ class StreamCommandController extends AbstractController
             // de la connexion HTTP, a un reload de la page, ou a la fermeture
             // de l onglet. Un coupure ne laisse donc plus le statut bloque sur
             // "running" avec un process mort.
+            // "Relancer" (force) : on tue l eventuel process en cours et on
+            // repart d un journal vide, pour vraiment tout refaire. Une
+            // reconnexion automatique, elle, ne force pas et reprend.
+            if ($force) {
+                if ($this->isProcessAlive($pidFile)) {
+                    $pid = (int) trim((string) file_get_contents($pidFile));
+                    $this->killProcessTree($pid);
+                    usleep(300000);
+                }
+                @unlink($logFile);
+                @unlink($pidFile);
+            }
+
             if (!$this->isProcessAlive($pidFile)) {
                 @unlink($logFile);
                 $joined = implode(' ', array_map('escapeshellarg', array_merge(
