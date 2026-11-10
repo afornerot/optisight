@@ -453,6 +453,10 @@ class AnalysisController extends AbstractController
             $pageData = $this->buildPageData($report);
 
             return new StreamedResponse(function () use ($pageData, $report) {
+                // Meme piege que StreamCommandController : php.ini limite a
+                //30 s, un appel LLM par indicateur le depasse aisement.
+                set_time_limit(0);
+
                 while (ob_get_level() > 0) {
                     ob_end_flush();
                 }
@@ -541,6 +545,10 @@ class AnalysisController extends AbstractController
             $cookieHeader = $analysis->getSite()->getCookieHeader();
 
             return new StreamedResponse(function () use ($url, $cookieHeader, $report) {
+                // Meme piege : lighthouse + pa11y + eventuels appels reseau
+                // depassent les30 s de php.ini sur une page lourde.
+                set_time_limit(0);
+
                 while (ob_get_level() > 0) {
                     ob_end_flush();
                 }

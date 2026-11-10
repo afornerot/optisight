@@ -100,6 +100,12 @@ class StreamCommandController extends AbstractController
         $pidFile = $this->getPidFile($type, $id);
 
         $response = new StreamedResponse(function () use ($consolePath, $command, $arguments, $pidFile) {
+            // php.ini fixe max_execution_time a 30 s et le code ne le
+            // levait pas : une analyse de69 pages dure plusieurs minutes,
+            // le flux etait tue a30 s pile (page 1 =15 s + page 2 =15 s),
+            // d ou "Error in input stream" cote navigateur.
+            set_time_limit(0);
+
             while (ob_get_level() > 0) {
                 ob_end_flush();
             }
