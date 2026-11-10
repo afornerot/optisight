@@ -468,9 +468,22 @@ class AnalysisController extends AbstractController
                 $indicators = \App\Service\AiService::INDICATORS;
                 $labels = \App\Service\AiService::INDICATOR_LABELS;
 
+                // Reprend d ou l on en etait : chaque indicateur termine est
+                // sauvegarde, une reconnexion ne rappelle donc pas le LLM pour
+                // ce qui a deja reussi.
+                $results = $report->getAiAnalysis() ?? [];
+
                 foreach ($indicators as $idx => $indicator) {
                     $num = $idx + 1;
                     $label = $labels[$indicator];
+
+                    if (isset($results[$indicator])) {
+                        echo "DONE_" . strtoupper($indicator) . ":OK\n";
+                        if (ob_get_level() > 0) { ob_flush(); }
+                        flush();
+                        continue;
+                    }
+
                     echo "STEP:({$num}/5) Analyse {$label}...\n";
                     if (ob_get_level() > 0) { ob_flush(); }
                     flush();
@@ -489,6 +502,12 @@ class AnalysisController extends AbstractController
                         $results[$indicator] = ['summary' => '', 'recommendations' => []];
                         echo "DONE_" . strtoupper($indicator) . ":ERROR:" . substr($e->getMessage(), 0, 100) . "\n";
                     }
+
+                    // Sauvegarde apres chaque indicateur : une coupure ne perd
+                    // rien de ce qui a deja ete paye/appelle.
+                    $report->setAiAnalysis($results);
+                    $report->setAiAnalysisAt(new \DateTimeImmutable());
+                    $this->em->flush();
 
                     if (ob_get_level() > 0) { ob_flush(); }
                     flush();
