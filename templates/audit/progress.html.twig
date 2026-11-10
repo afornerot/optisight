@@ -202,8 +202,6 @@
                 // Le travail continue cote serveur (process detache) : on se
                 // rattache. Le re-attach rejoue le journal depuis le debut,
                 // les lignes deja affichees sont ignorees via renderedCount.
-                consoleEl.innerHTML += '<div class="text-warning">Connexion perdue (' + esc(error.message) + ') — reconnexion dans 2 s…</div>';
-                setStatus('Reconnexion…', 'warning');
                 skipRemaining = renderedCount;
                 buffer = '';
                 await new Promise(r => setTimeout(r, 2000));
