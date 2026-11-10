@@ -46,6 +46,12 @@ class LighthouseService
         $process->setEnv(array_merge($_ENV, [
             'PATH' => $this->getBinPath(),
             'CHROME_BIN' => '/usr/bin/chromium',
+            // HOME par defaut (/var/www) n'est pas inscriptible par apache :
+            // chromium ne peut pas creer son profil et l'analyse s'arrete
+            // au premier lancement ("Failed to create headless user data
+            // directory container"). /tmp est inscriptible et deja utilise
+            // par Pa11yService (PUPPETEER_CACHE_DIR).
+            'HOME' => '/tmp',
         ]));
 
         try {

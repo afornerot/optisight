@@ -63,6 +63,9 @@ class Pa11yService
                 'PATH' => $this->getBinPath(),
                 'CHROME_BIN' => '/usr/bin/chromium',
                 'PUPPETEER_CACHE_DIR' => '/tmp/puppeteer_cache',
+                // Voir LighthouseService : /var/www n'est pas inscriptible
+                // par apache, chromium ne peut pas creer son profil.
+                'HOME' => '/tmp',
             ]));
 
             $process->run();
