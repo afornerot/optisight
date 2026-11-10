@@ -10,7 +10,6 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\KernelInterface;
-use Symfony\Component\Process\Process;
 use Symfony\Component\Routing\Annotation\Route;
 
 #[\Symfony\Component\Routing\Attribute\Route('/audit/stream')]
@@ -98,13 +97,14 @@ class StreamCommandController extends AbstractController
     {
         $consolePath = $this->kernel->getProjectDir() . '/bin/console';
         $pidFile = $this->getPidFile($type, $id);
+        $logFile = $this->getLogFile($type, $id);
 
-        $response = new StreamedResponse(function () use ($consolePath, $command, $arguments, $pidFile) {
-            // php.ini fixe max_execution_time a 30 s et le code ne le
-            // levait pas : une analyse de69 pages dure plusieurs minutes,
-            // le flux etait tue a30 s pile (page 1 =15 s + page 2 =15 s),
-            // d ou "Error in input stream" cote navigateur.
+        $response = new StreamedResponse(function () use ($consolePath, $command, $arguments, $pidFile, $logFile) {
+            // Flux long : aucune limite de temps (voir history, php.ini = 30 s).
             set_time_limit(0);
+            // Le client peut partir sans tuer l analyse : on le detecte et on
+            // rend la main, le process detache continue son travail.
+            ignore_user_abort(true);
 
             while (ob_get_level() > 0) {
                 ob_end_flush();
@@ -113,33 +113,66 @@ class StreamCommandController extends AbstractController
             ini_set('zlib.output_compression', '0');
             ob_implicit_flush(true);
 
-            $process = new Process(array_merge(
-                ['php', $consolePath, $command],
-                array_map('strval', $arguments)
-            ));
-            $process->setTimeout(null);
-            $process->start();
+            // L analyse est lancee DETACHEE (nohup) : elle survit a la coupure
+            // de la connexion HTTP, a un reload de la page, ou a la fermeture
+            // de l onglet. Un coupure ne laisse donc plus le statut bloque sur
+            // "running" avec un process mort.
+            if (!$this->isProcessAlive($pidFile)) {
+                @unlink($logFile);
+                $joined = implode(' ', array_map('escapeshellarg', array_merge(
+                    [$consolePath, $command],
+                    array_map('strval', $arguments)
+                )));
+                exec(sprintf(
+                    'nohup php %s >> %s 2>&1 < /dev/null & echo $! > %s',
+                    $joined,
+                    escapeshellarg($logFile),
+                    escapeshellarg($pidFile)
+                ));
+                usleep(250000);
+            }
 
-            file_put_contents($pidFile, $process->getPid());
-
-            while ($process->isRunning()) {
-                usleep(10000);
-                echo $process->getIncrementalOutput();
-                echo $process->getIncrementalErrorOutput();
-                if (ob_get_level() > 0) {
-                    ob_flush();
+            // Lecture depuis le debut du fichier : un reload retrouve tout ce
+            // qui a deja ete produit, puis suit en temps reel.
+            $fh = @fopen($logFile, 'rb');
+            while (true) {
+                $chunk = $fh ? fread($fh, 8192) : '';
+                if (is_string($chunk) && '' !== $chunk) {
+                    echo $chunk;
+                    if (ob_get_level() > 0) {
+                        ob_flush();
+                    }
+                    flush();
+                    continue;
                 }
-                flush();
+
+                if (connection_aborted()) {
+                    // Client parti : le process detache continue seul.
+                    break;
+                }
+
+                if (!$this->isProcessAlive($pidFile)) {
+                    $tail = $fh ? stream_get_contents($fh) : '';
+                    if (is_string($tail) && '' !== $tail) {
+                        echo $tail;
+                        if (ob_get_level() > 0) {
+                            ob_flush();
+                        }
+                        flush();
+                    }
+                    break;
+                }
+
+                usleep(100000);
             }
 
-            @unlink($pidFile);
-
-            echo $process->getIncrementalOutput();
-            echo $process->getIncrementalErrorOutput();
-            if (ob_get_level() > 0) {
-                ob_flush();
+            if ($fh) {
+                fclose($fh);
             }
-            flush();
+
+            if (!$this->isProcessAlive($pidFile)) {
+                @unlink($pidFile);
+            }
         });
 
         $response->headers->set('Content-Type', 'text/plain; charset=utf-8');
@@ -148,6 +181,33 @@ class StreamCommandController extends AbstractController
 
         return $response;
     }
+
+    private function getLogFile(string $type, int $id): string
+    {
+        return sys_get_temp_dir() . "/optisight_{$type}_{$id}.log";
+    }
+
+    /**
+     * Le processus de l analyse est detache (nohup) : il doit survivre a la
+     * coupure de la connexion HTTP, sinon chaque coupure tue l analyse et
+     * laisse le statut bloque sur "running".
+     */
+    private function isProcessAlive(string $pidFile): bool
+    {
+        if (!file_exists($pidFile)) {
+            return false;
+        }
+
+        $pid = (int) trim((string) file_get_contents($pidFile));
+        if ($pid <= 1) {
+            return false;
+        }
+
+        exec("kill -0 {$pid} 2>/dev/null", $output, $code);
+
+        return 0 === $code;
+    }
+
 
     private function getPidFile(string $type, int $id): string
     {
