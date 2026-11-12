@@ -12,6 +12,9 @@ class Pa11yService
     private int $timeout;
     private int $wait;
 
+    /** @var array<int, string> Fichiers de configuration temporaires, par processus */
+    private array $configFiles = [];
+
     public function __construct(LoggerInterface $logger)
     {
         $this->logger = $logger;
@@ -21,11 +24,12 @@ class Pa11yService
     }
 
     /**
-     * Run pa11y accessibility analysis on a URL.
+     * Lance Pa11y sans attendre sa fin : l'appelant démarre ensuite l'autre
+     * moteur, et les deux navigateurs tournent en parallèle.
      *
-     * @return array{score: float, errors: array, warnings: array, raw: mixed}|null
+     * @return Process|null null si le processus n'a pas pu démarrer
      */
-    public function analyze(string $url, ?string $cookieHeader = null): ?array
+    public function start(string $url, ?string $cookieHeader = null): ?Process
     {
         $config = [
             'chromeLaunchConfig' => [
@@ -48,27 +52,51 @@ class Pa11yService
         $configFile = tempnam(sys_get_temp_dir(), 'pa11y_') . '.json';
         file_put_contents($configFile, json_encode($config));
 
-        try {
-            $process = new Process([
-                'pa11y',
-                '--standard', $this->standard,
-                '--reporter', 'json',
-                '--timeout', (string) $this->timeout,
-                '--wait', (string) $this->wait,
-                '--config', $configFile,
-                $url,
-            ]);
-            $process->setTimeout(120);
-            $process->setEnv(array_merge($_ENV, [
-                'PATH' => $this->getBinPath(),
-                'CHROME_BIN' => '/usr/bin/chromium',
-                'PUPPETEER_CACHE_DIR' => '/tmp/puppeteer_cache',
-                // Voir LighthouseService : /var/www n'est pas inscriptible
-                // par apache, chromium ne peut pas creer son profil.
-                'HOME' => '/tmp',
-            ]));
+        $process = new Process([
+            'pa11y',
+            '--standard', $this->standard,
+            '--reporter', 'json',
+            '--timeout', (string) $this->timeout,
+            '--wait', (string) $this->wait,
+            '--config', $configFile,
+            $url,
+        ]);
+        $process->setTimeout(120);
+        $process->setEnv(array_merge($_ENV, [
+            'PATH' => $this->getBinPath(),
+            'CHROME_BIN' => '/usr/bin/chromium',
+            'PUPPETEER_CACHE_DIR' => '/tmp/puppeteer_cache',
+            // Voir LighthouseService : /var/www n'est pas inscriptible
+            // par apache, chromium ne peut pas creer son profil.
+            'HOME' => '/tmp',
+        ]));
 
-            $process->run();
+        $this->configFiles[spl_object_id($process)] = $configFile;
+
+        try {
+            $process->start();
+        } catch (\Exception $e) {
+            $this->logger->error('pa11y could not start for: ' . $url, ['error' => $e->getMessage()]);
+            $this->cleanup($process);
+            return null;
+        }
+
+        return $process;
+    }
+
+    /**
+     * Attend la fin d'un processus lance par start() et lit ses constats.
+     *
+     * @return array{score: float, errors: list<mixed>, warnings: list<mixed>, raw: mixed}|null
+     */
+    public function parse(?Process $process, string $url): ?array
+    {
+        if ($process === null) {
+            return null;
+        }
+
+        try {
+            $process->wait();
             $output = $process->getOutput() ?: $process->getErrorOutput();
 
             if (empty($output)) {
@@ -96,8 +124,29 @@ class Pa11yService
             $this->logger->error('pa11y exception for: ' . $url, ['error' => $e->getMessage()]);
             return null;
         } finally {
-            @unlink($configFile);
+            $this->cleanup($process);
         }
+    }
+
+    /**
+     * Lance Pa11y et attend ses constats — raccourci pour un seul moteur.
+     *
+     * @return array{score: float, errors: list<mixed>, warnings: list<mixed>, raw: mixed}|null
+     */
+    public function analyze(string $url, ?string $cookieHeader = null): ?array
+    {
+        return $this->parse($this->start($url, $cookieHeader), $url);
+    }
+
+    private function cleanup(Process $process): void
+    {
+        $id = spl_object_id($process);
+        if (!isset($this->configFiles[$id])) {
+            return;
+        }
+
+        @unlink($this->configFiles[$id]);
+        unset($this->configFiles[$id]);
     }
 
     private function getBinPath(): string

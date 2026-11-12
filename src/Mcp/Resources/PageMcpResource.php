@@ -104,7 +104,11 @@ class PageMcpResource
         $cookieHeader = $site?->getAuthCookies();
         $url = $report->getUrl();
 
-        $lhResult = $this->lighthouseService->analyze($url, $cookieHeader);
+        // Les deux moteurs tournent en parallele : les demarrer avant d'en
+        // attendre un divise le temps de l'analyse par page.
+        $lhProcess = $this->lighthouseService->start($url, $cookieHeader);
+        $paProcess = $this->pa11yService->start($url, $cookieHeader);
+        $lhResult = $this->lighthouseService->parse($lhProcess, $url);
         if ($lhResult) {
             $report->setLhPerformance($lhResult['performance']);
             $report->setLhAccessibility($lhResult['accessibility']);
@@ -113,7 +117,7 @@ class PageMcpResource
             $report->setLighthouseReport($lhResult['raw']);
         }
 
-        $paResult = $this->pa11yService->analyze($url, $cookieHeader);
+        $paResult = $this->pa11yService->parse($paProcess, $url);
         if ($paResult) {
             $report->setRgaaScore($paResult['score']);
             $report->setRgaaErrors($paResult['errors']);

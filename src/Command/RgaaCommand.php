@@ -100,7 +100,15 @@ class RgaaCommand extends Command
                     'depth' => $page['depth'] ?? null,
                 ]);
 
-                $lhResult = $this->lighthouse->analyze($page['url'], $cookieHeader);
+                // Les deux moteurs tournent en parallele : chacun lance son
+                // Chromium. Les demarrer tous les deux avant d'en attendre un
+                // divise le temps par page (14 s -> ~7 s) sans changer le
+                // resultat.
+                $lhProcess = $this->lighthouse->start($page['url'], $cookieHeader);
+                $paProcess = $this->pa11y->start($page['url'], $cookieHeader);
+                $lhResult = $this->lighthouse->parse($lhProcess, $page['url']);
+                $paResult = $this->pa11y->parse($paProcess, $page['url']);
+
                 if ($lhResult) {
                     $report->setLhPerformance($lhResult['performance']);
                     $report->setLhAccessibility($lhResult['accessibility']);
@@ -112,7 +120,6 @@ class RgaaCommand extends Command
                     $output->writeln("LH:NONE");
                 }
 
-                $paResult = $this->pa11y->analyze($page['url'], $cookieHeader);
                 if ($paResult) {
                     $errors = count($paResult['errors']);
                     $warnings = count($paResult['warnings']);

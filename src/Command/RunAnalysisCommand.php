@@ -103,7 +103,13 @@ class RunAnalysisCommand extends Command
                     'depth' => $page['depth'],
                 ]);
 
-                $lhResult = $this->lighthouse->analyze($page['url'], $cookieHeader);
+                // Les deux moteurs tournent en parallele (voir RgaaCommand) :
+                // les demarrer avant d'en attendre un divise le temps par page.
+                $lhProcess = $this->lighthouse->start($page['url'], $cookieHeader);
+                $paProcess = $this->pa11y->start($page['url'], $cookieHeader);
+                $lhResult = $this->lighthouse->parse($lhProcess, $page['url']);
+                $paResult = $this->pa11y->parse($paProcess, $page['url']);
+
                 if ($lhResult) {
                     $report->setLhPerformance($lhResult['performance']);
                     $report->setLhAccessibility($lhResult['accessibility']);
@@ -112,7 +118,6 @@ class RunAnalysisCommand extends Command
                     $report->setLighthouseReport($lhResult['raw']);
                 }
 
-                $paResult = $this->pa11y->analyze($page['url'], $cookieHeader);
                 if ($paResult) {
                     $report->setRgaaScore($paResult['score']);
                     $report->setRgaaErrors($paResult['errors']);

@@ -586,11 +586,15 @@ class AnalysisController extends AbstractController
                 ini_set('zlib.output_compression', '0');
                 ob_implicit_flush(true);
 
-                echo "STEP:Lancement de Lighthouse sur {$url}...\n";
+                echo "STEP:Lancement de Lighthouse et pa11y sur {$url}...\n";
                 if (ob_get_level() > 0) { ob_flush(); }
                 flush();
 
-                $lhResult = $this->lighthouse->analyze($url, $cookieHeader);
+                // Les deux moteurs tournent en parallele : les demarrer avant
+                // d'en attendre un divise par deux le temps de la page.
+                $lhProcess = $this->lighthouse->start($url, $cookieHeader);
+                $paProcess = $this->pa11y->start($url, $cookieHeader);
+                $lhResult = $this->lighthouse->parse($lhProcess, $url);
 
                 if ($lhResult) {
                     $report->setLhPerformance($lhResult['performance']);
@@ -606,11 +610,12 @@ class AnalysisController extends AbstractController
                 if (ob_get_level() > 0) { ob_flush(); }
                 flush();
 
-                echo "STEP:Lancement de pa11y sur {$url}...\n";
+                echo "STEP:Attente de pa11y sur {$url}...\n";
                 if (ob_get_level() > 0) { ob_flush(); }
                 flush();
 
-                $paResult = $this->pa11y->analyze($url, $cookieHeader);
+                // pa11y a demarre avec Lighthouse : on n'attend que son resultat.
+                $paResult = $this->pa11y->parse($paProcess, $url);
 
                 if ($paResult) {
                     $report->setRgaaScore($paResult['score']);
