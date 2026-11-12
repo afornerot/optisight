@@ -40,6 +40,11 @@ services:
       - ./misc:/app/misc:delegated
       - ./public/lib:/app/public/lib:delegated
       - ./.env.local:/app/.env.local
+      # Le dépôt est monté dossier par dossier : deux fichiers du projet doivent
+      # l'être explicitement — le dossier des scripts (bin/console, bin/inspect.js)
+      # et le guide que sert l'outil MCP.
+      - ./bin:/app/bin:delegated
+      - ./MCP.md:/app/MCP.md:ro
       # CA local de l'instance de développement, et politique Chromium qui le rend
       # fiable aux moteurs. Le nom sous /etc/ssl/certs est l'empreinte OpenSSL du
       # CA : seul nom sous lequel CApath le retrouve, sans update-ca-certificates.

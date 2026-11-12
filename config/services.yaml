@@ -55,3 +55,13 @@ services:
   App\Service\AuthService:
     arguments:
       $projectDir: '%kernel.project_dir%'
+
+  # Le guide MCP et l'inspection d'un nœud lisent, l'un un fichier du dépôt,
+  # l'autre un script node : tous deux ont besoin du chemin du projet.
+  App\Service\InspectService:
+    arguments:
+      $projectDir: '%kernel.project_dir%'
+
+  App\Mcp\Resources\GuideMcpResource:
+    arguments:
+      $projectDir: '%kernel.project_dir%'

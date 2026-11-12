@@ -6,6 +6,8 @@ use App\Mcp\Resources\SiteMcpResource;
 use App\Mcp\Resources\AuditMcpResource;
 use App\Mcp\Resources\PageMcpResource;
 use App\Mcp\Resources\AiMcpResource;
+use App\Mcp\Resources\CrawlMcpResource;
+use App\Mcp\Resources\GuideMcpResource;
 use App\Mcp\Security\McpAuthenticator;
 use App\Mcp\Server\McpServer;
 use App\Repository\McpApiKeyRepository;
@@ -28,6 +30,8 @@ class McpController extends AbstractController
         AuditMcpResource $auditResource,
         PageMcpResource $pageResource,
         AiMcpResource $aiResource,
+        CrawlMcpResource $crawlResource,
+        GuideMcpResource $guideResource,
         McpAuthenticator $authenticator,
         McpApiKeyRepository $apiKeyRepository,
         EntityManagerInterface $em,
@@ -36,7 +40,7 @@ class McpController extends AbstractController
         $this->authenticator = $authenticator;
         $this->server = new McpServer($authenticator, $logger);
 
-        $this->registerTools($siteResource, $auditResource, $pageResource, $aiResource, $apiKeyRepository, $em);
+        $this->registerTools($siteResource, $auditResource, $pageResource, $aiResource, $crawlResource, $guideResource, $apiKeyRepository, $em);
     }
 
     private function registerTools(
@@ -44,6 +48,8 @@ class McpController extends AbstractController
         AuditMcpResource $auditResource,
         PageMcpResource $pageResource,
         AiMcpResource $aiResource,
+        CrawlMcpResource $crawlResource,
+        GuideMcpResource $guideResource,
         McpApiKeyRepository $apiKeyRepository,
         EntityManagerInterface $em
     ): void {
@@ -227,6 +233,120 @@ class McpController extends AbstractController
                     'auditId' => ['type' => 'integer', 'description' => 'Audit ID to generate AI summary for'],
                 ],
                 'required' => ['auditId'],
+            ],
+        ]);
+
+        // ─── Crawl ────────────────────────────────────────────────────────────
+
+        $this->server->registerTool('optisight.crawl.trigger', function ($args, $token) use ($crawlResource) {
+            $apiKey = $this->authenticator->authenticate($token);
+            if (!$apiKey || !$apiKey->hasPermission('crawl.trigger')) {
+                throw new \Exception('Permission denied: crawl.trigger');
+            }
+            return $crawlResource->trigger($args, $apiKey);
+        }, [
+            'description' => 'Crawl a site and store its page list. An audit does NOT crawl: run this first when the site changed.',
+            'inputSchema' => [
+                'type' => 'object',
+                'properties' => [
+                    'siteId' => ['type' => 'integer', 'description' => 'Site ID to crawl'],
+                    'dedup' => ['type' => 'boolean', 'description' => 'Keep one page per route shape (default: the deployment setting)'],
+                ],
+                'required' => ['siteId'],
+            ],
+        ]);
+
+        $this->server->registerTool('optisight.crawl.status', function ($args, $token) use ($crawlResource) {
+            $apiKey = $this->authenticator->authenticate($token);
+            if (!$apiKey || !$apiKey->hasPermission('crawl.status')) {
+                throw new \Exception('Permission denied: crawl.status');
+            }
+            return $crawlResource->status($args, $apiKey);
+        }, [
+            'description' => 'Crawl state, page count, and the tail of the crawl log: every discarded URL with its reason',
+            'inputSchema' => [
+                'type' => 'object',
+                'properties' => [
+                    'siteId' => ['type' => 'integer', 'description' => 'Site ID'],
+                ],
+                'required' => ['siteId'],
+            ],
+        ]);
+
+        // ─── Findings, comparison, guide ──────────────────────────────────────
+
+        $this->server->registerTool('optisight.audit.findings', function ($args, $token) use ($auditResource) {
+            $apiKey = $this->authenticator->authenticate($token);
+            if (!$apiKey || !$apiKey->hasPermission('audits.get')) {
+                throw new \Exception('Permission denied: audits.get');
+            }
+            return $auditResource->findings($args, $apiKey);
+        }, [
+            'description' => 'Findings of an audit, grouped by node shape (the leverage view), rule or page',
+            'inputSchema' => [
+                'type' => 'object',
+                'properties' => [
+                    'auditId' => ['type' => 'integer', 'description' => 'Audit ID'],
+                    'groupBy' => ['type' => 'string', 'enum' => ['shape', 'rule', 'page'], 'description' => 'Grouping (default: shape)'],
+                    'limit' => ['type' => 'integer', 'description' => 'Maximum groups returned (default: 50)'],
+                ],
+                'required' => ['auditId'],
+            ],
+        ]);
+
+        $this->server->registerTool('optisight.audit.compare', function ($args, $token) use ($auditResource) {
+            $apiKey = $this->authenticator->authenticate($token);
+            if (!$apiKey || !$apiKey->hasPermission('audits.get')) {
+                throw new \Exception('Permission denied: audits.get');
+            }
+            return $auditResource->compare($args, $apiKey);
+        }, [
+            'description' => 'Compare two audits: fixed, appeared, unchanged, and the score deltas',
+            'inputSchema' => [
+                'type' => 'object',
+                'properties' => [
+                    'baseAuditId' => ['type' => 'integer', 'description' => 'Audit before the change'],
+                    'headAuditId' => ['type' => 'integer', 'description' => 'Audit after the change'],
+                    'threshold' => ['type' => 'integer', 'description' => 'How many new findings are tolerated (default: 0)'],
+                ],
+                'required' => ['baseAuditId', 'headAuditId'],
+            ],
+        ]);
+
+        $this->server->registerTool('optisight.page.inspect', function ($args, $token) use ($pageResource) {
+            $apiKey = $this->authenticator->authenticate($token);
+            if (!$apiKey || !$apiKey->hasPermission('pages.get')) {
+                throw new \Exception('Permission denied: pages.get');
+            }
+            return $pageResource->inspect($args, $apiKey);
+        }, [
+            'description' => 'Measured facts behind a finding: computed colours, effective opacity, contrast ratio, target size, accessible name',
+            'inputSchema' => [
+                'type' => 'object',
+                'properties' => [
+                    'pageId' => ['type' => 'integer', 'description' => 'Page report ID'],
+                    'selector' => ['type' => 'string', 'description' => 'CSS selector of the node'],
+                    'rule' => ['type' => 'string', 'description' => 'Rule code, e.g. H91.InputNumber.Name (used with index when no selector is given)'],
+                    'index' => ['type' => 'integer', 'description' => 'Which occurrence of that rule (default: 0)'],
+                    'wait' => ['type' => 'integer', 'description' => 'Milliseconds to wait after load (default: 1500)'],
+                ],
+                'required' => ['pageId'],
+            ],
+        ]);
+
+        $this->server->registerTool('optisight.guide', function ($args, $token) use ($guideResource) {
+            $apiKey = $this->authenticator->authenticate($token);
+            if (!$apiKey || !$apiKey->hasPermission('guide')) {
+                throw new \Exception('Permission denied: guide');
+            }
+            return $guideResource->get($args, $apiKey);
+        }, [
+            'description' => 'How to drive this MCP surface: the loop, the tools, the traps and the recipes',
+            'inputSchema' => [
+                'type' => 'object',
+                'properties' => [
+                    'topic' => ['type' => 'string', 'description' => 'Only the sections whose title contains this word'],
+                ],
             ],
         ]);
     }
