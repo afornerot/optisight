@@ -137,6 +137,17 @@ class RgaaCommand extends Command
 
                 $analysis->setPagesCrawled($num);
                 $this->em->flush();
+
+                // Chaque rapport Lighthouse pèse des centaines de kilo-octets et
+                // reste attaché au gestionnaire d'entités : sans purge périodique,
+                // un site de quelques centaines de pages épuise la mémoire de PHP.
+                if ($num % 20 === 0) {
+                    $this->em->clear();
+                    $analysis = $this->em->getRepository(Analysis::class)->find($id);
+                    if ($analysis === null) {
+                        throw new \RuntimeException("Analyse #{$id} introuvable pendant le traitement.");
+                    }
+                }
             }
 
             $this->em->refresh($analysis);

@@ -20,6 +20,15 @@ services:
     image: reg.cadoles.com/envole/optisight
     depends_on: 
       - mariadb
+    environment:
+      # Le crawl ne garde qu une page par forme : filtres, pagination et
+      # identifiants produisaient 303 URL pour 57 ecrans. CRAWL_DEDUP_SHAPE=0
+      # rend l ancien comportement ; les prefixes sont les ids lisibles du produit.
+      CRAWL_DEDUP_SHAPE: "1"
+      CRAWL_SHAPE_ID_PREFIXES: "vm,mbr,mdl,prov,app,team,role,mw,usr,tok,pvm,inv,alert,qta,plan,share,org"
+      # Le slug d organisation multiplie chaque ecran par le nombre d
+      # organisations : l enfant de « orgs » est un identifiant de forme.
+      CRAWL_SHAPE_MASK_AFTER: "orgs"
     ports:
       - "8027:80"
     volumes:
@@ -31,6 +40,11 @@ services:
       - ./misc:/app/misc:delegated
       - ./public/lib:/app/public/lib:delegated
       - ./.env.local:/app/.env.local
+      # CA local de l'instance de développement, et politique Chromium qui le rend
+      # fiable aux moteurs. Le nom sous /etc/ssl/certs est l'empreinte OpenSSL du
+      # CA : seul nom sous lequel CApath le retrouve, sans update-ca-certificates.
+      - ./misc/certs/xolo-dev-ca.crt:/etc/ssl/certs/8b5901f4.0:ro
+      - ./misc/certs/xolo-dev-chromium-policy.json:/etc/chromium/policies/managed/xolo-dev.json:ro
 
   adminer:
     image: adminer
