@@ -12,6 +12,11 @@ class CrawlerService
     private int $maxPages;
     private int $maxDepth;
     private int $delayMs;
+    private bool $dedupShape;
+    /** @var string[] */
+    private array $shapeIdPrefixes;
+    /** @var string[] */
+    private array $shapeIdParents;
 
     public function __construct(
         HttpClientInterface $http,
@@ -19,9 +24,32 @@ class CrawlerService
     ) {
         $this->http = $http;
         $this->logger = $logger;
-        $this->maxPages = (int) ($_ENV['CRAWL_MAX_PAGES'] ?? 500);
-        $this->maxDepth = (int) ($_ENV['CRAWL_MAX_DEPTH'] ?? 10);
-        $this->delayMs = (int) ($_ENV['CRAWL_DELAY_MS'] ?? 1000);
+        $this->maxPages = (int) $this->env('CRAWL_MAX_PAGES', '500');
+        $this->maxDepth = (int) $this->env('CRAWL_MAX_DEPTH', '10');
+        $this->delayMs = (int) $this->env('CRAWL_DELAY_MS', '1000');
+        $this->dedupShape = $this->env('CRAWL_DEDUP_SHAPE', '1') !== '0';
+        $this->shapeIdPrefixes = $this->segments('CRAWL_SHAPE_ID_PREFIXES');
+        $this->shapeIdParents = $this->segments('CRAWL_SHAPE_MASK_AFTER');
+    }
+
+    /** @return string[] */
+    private function segments(string $name): array
+    {
+        return array_values(array_filter(array_map('trim', explode(',', $this->env($name, '')))));
+    }
+
+    /**
+     * `$_ENV` ne porte pas les variables du processus : sans ce repli sur
+     * getenv(), aucun réglage passé au conteneur n'aurait d'effet.
+     */
+    private function env(string $name, string $default): string
+    {
+        $value = $_ENV[$name] ?? getenv($name);
+        if ($value === false || $value === '') {
+            return $default;
+        }
+
+        return (string) $value;
     }
 
     /**
@@ -38,8 +66,10 @@ class CrawlerService
     {
         $visited = [];
         $pages = [];
+        $seenShapes = [];
         $queue = [['url' => rtrim($rootUrl, '/'), 'depth' => 0]];
         $baseHost = parse_url($rootUrl, PHP_URL_HOST);
+        $siteAuthority = $this->authorityOf($rootUrl);
         $totalQueued = 1;
 
         while (!empty($queue) && count($pages) < $this->maxPages) {
@@ -69,6 +99,7 @@ class CrawlerService
                 $redirects = 0;
                 $currentUrl = $url;
                 $maxRedirects = 5;
+                $leftSite = false;
                 do {
                     $response = $this->http->request('GET', $currentUrl, [
                         'timeout' => 10,
@@ -86,8 +117,8 @@ class CrawlerService
                             $port = $parts['port'] ?? null;
                             $redirectUrl = $parts['scheme'] . '://' . $parts['host'] . ($port !== null ? ':' . $port : '') . $location;
                         }
-                        $redirectHost = parse_url($redirectUrl, PHP_URL_HOST);
-                        if ($redirectHost !== $baseHost) {
+                        if ($this->authorityOf($redirectUrl) !== $siteAuthority) {
+                            $leftSite = true;
                             break;
                         }
                         $currentUrl = $redirectUrl;
@@ -96,6 +127,48 @@ class CrawlerService
                         break;
                     }
                 } while ($redirects < $maxRedirects);
+
+                // Une page qui renvoie vers un autre site n'est pas auditée :
+                // les moteurs la suivraient sans cookie, jusqu'à la connexion.
+                if ($leftSite) {
+                    if ($onPageFound) {
+                        $onPageFound([
+                            'url' => $url,
+                            'status' => $statusCode,
+                            'skipped' => true,
+                            'reason' => 'redirect_external',
+                        ]);
+                    }
+                    continue;
+                }
+
+                // L'URL retenue est celle où la page est servie : une redirection
+                // interne ne doit pas faire analyser l'URL qui redirige.
+                if ($currentUrl !== $url) {
+                    if (isset($visited[$currentUrl])) {
+                        continue;
+                    }
+                    $visited[$currentUrl] = true;
+                }
+
+                // Une page par forme : les variantes de filtre, de pagination ou
+                // d'identifiant sont annoncées et rattachées à leur représentante.
+                if ($this->dedupShape) {
+                    $shape = $this->shapeOf($currentUrl);
+                    if (isset($seenShapes[$shape])) {
+                        if ($onPageFound) {
+                            $onPageFound([
+                                'url' => $currentUrl,
+                                'status' => $statusCode,
+                                'skipped' => true,
+                                'reason' => 'duplicate_shape',
+                                'representedBy' => $seenShapes[$shape],
+                            ]);
+                        }
+                        continue;
+                    }
+                    $seenShapes[$shape] = $currentUrl;
+                }
 
                 $body = $response->getContent(false);
                 $contentType = $response->getHeaders(false)['content-type'][0] ?? '';
@@ -113,7 +186,7 @@ class CrawlerService
                 }
 
                 $page = [
-                    'url' => $url,
+                    'url' => $currentUrl,
                     'status' => $statusCode,
                     'depth' => $depth,
                     'title' => $this->extractTitle($body),
@@ -190,13 +263,57 @@ class CrawlerService
         return substr_count(strtolower($html), '<h1');
     }
 
+    /**
+     * Autorité d'une URL : hôte et port effectif — deux autorités différentes ne
+     * désignent pas le même site, même à hôte partagé.
+     */
+    private function authorityOf(string $url): string
+    {
+        $host = (string) parse_url($url, PHP_URL_HOST);
+        $port = parse_url($url, PHP_URL_PORT);
+        if ($port === null) {
+            $port = parse_url($url, PHP_URL_SCHEME) === 'http' ? 80 : 443;
+        }
+
+        return $host . ':' . $port;
+    }
+
+    /**
+     * Forme d'une URL : autorité et chemin, requête ignorée, chaque identifiant
+     * replié sur « {id} ». Sont des identifiants les valeurs opaques et celles
+     * que le site déclare — CRAWL_SHAPE_ID_PREFIXES pour les préfixes lisibles
+     * (mbr-, mdl-…), CRAWL_SHAPE_MASK_AFTER pour les parents dont l'enfant en
+     * est un (orgs).
+     */
+    private function shapeOf(string $url): string
+    {
+        $path = (string) parse_url($url, PHP_URL_PATH);
+        $previous = '';
+        $segments = array_map(function (string $segment) use (&$previous): string {
+            $masked = in_array($previous, $this->shapeIdParents, true)
+                || preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $segment)
+                || preg_match('/^[0-9a-f]{16,}$/i', $segment)
+                || preg_match('/^\d+$/', $segment);
+            foreach ($this->shapeIdPrefixes as $prefix) {
+                $masked = $masked || str_starts_with($segment, $prefix . '-');
+            }
+            $previous = $segment;
+
+            return $masked ? '{id}' : $segment;
+        }, array_filter(explode('/', $path), static fn (string $s): bool => $s !== ''));
+
+        return $this->authorityOf($url) . '/' . implode('/', $segments);
+    }
+
     private function extractInternalLinks(string $html, string $baseHost, ?callable $isExcluded = null, string $baseUrl = ''): array
     {
         $links = [];
 
         if (preg_match_all('#<a\s+[^>]*href=["\']([^"\']*)["\']#is', $html, $m)) {
-            foreach ($m[1] as $href) {
-                $href = trim($href);
+            foreach ($m[1] as $rawHref) {
+                // Les liens sortent échappés du HTML : sans décodage, une chaîne
+                // de requête part avec « &amp; » et désigne une autre URL.
+                $href = trim(html_entity_decode($rawHref, ENT_QUOTES | ENT_HTML5));
 
                 if (str_starts_with($href, '#') || str_starts_with($href, 'mailto:') || str_starts_with($href, 'javascript:') || str_starts_with($href, 'tel:')) {
                     continue;
