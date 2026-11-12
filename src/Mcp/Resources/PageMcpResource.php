@@ -101,7 +101,10 @@ class PageMcpResource
 
         $analysis = $report->getAnalysis();
         $site = $analysis?->getSite();
-        $cookieHeader = $site?->getAuthCookies();
+        // getAuthCookies() rend le JSON stocké — un en-tête de cookie se
+        // construit avec getCookieHeader(). Sans cela les moteurs chargeaient
+        // la page de connexion et page.analyze annonçait des scores faux.
+        $cookieHeader = $site?->getCookieHeader();
         $url = $report->getUrl();
 
         // Les deux moteurs tournent en parallele : les demarrer avant d'en
