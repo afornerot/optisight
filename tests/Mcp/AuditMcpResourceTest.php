@@ -90,6 +90,53 @@ class AuditMcpResourceTest extends TestCase
         $this->assertTrue($resource->compare(['baseAuditId' => 1, 'headAuditId' => 2, 'threshold' => 1], null)['pass']);
     }
 
+    public function testHealthFlagsPagesMissingFromAnEngineAndHttpErrors(): void
+    {
+        $complete = new PageReport();
+        $complete->setUrl('https://xolo.test/a');
+        $complete->setLhPerformance(90.0);
+        $complete->setRgaaScore(100.0);
+        $complete->setHttpStatus(200);
+
+        $noLighthouse = new PageReport();
+        $noLighthouse->setUrl('https://xolo.test/b');
+        $noLighthouse->setRgaaScore(100.0);
+        $noLighthouse->setHttpStatus(404);
+
+        $analysis = $this->analysis(3, [$complete, $noLighthouse]);
+        $analysis->setStatus(Analysis::STATUS_COMPLETED);
+        $analysis->setTotalPages(2);
+
+        $result = $this->resource($analysis)->health(['auditId' => 3], null);
+
+        $this->assertFalse($result['pass']);
+        $this->assertSame(['total' => 2, 'analysed' => 2, 'missing' => 0], $result['pages']);
+        $this->assertSame(1, $result['engines']['lighthouse']['missing']);
+        $this->assertSame(['https://xolo.test/b'], $result['engines']['lighthouse']['urls']);
+        $this->assertSame(0, $result['engines']['pa11y']['missing']);
+        $this->assertSame([['url' => 'https://xolo.test/b', 'status' => 404]], $result['httpErrors']);
+    }
+
+    public function testHealthPassesAFullyAnalysedRun(): void
+    {
+        $report = new PageReport();
+        $report->setUrl('https://xolo.test/a');
+        $report->setLhPerformance(90.0);
+        $report->setRgaaScore(100.0);
+        $report->setHttpStatus(200);
+
+        $analysis = $this->analysis(4, [$report]);
+        $analysis->setStatus(Analysis::STATUS_COMPLETED);
+        $analysis->setTotalPages(1);
+
+        $result = $this->resource($analysis)->health(['auditId' => 4], null);
+
+        $this->assertTrue($result['pass']);
+        $this->assertTrue($result['terminal']);
+        $this->assertSame(0, $result['engines']['lighthouse']['missing']);
+        $this->assertSame(0, $result['engines']['pa11y']['missing']);
+    }
+
     public function testFindingsRequiresAuditId(): void
     {
         $this->expectException(\InvalidArgumentException::class);

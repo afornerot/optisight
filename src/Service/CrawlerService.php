@@ -13,6 +13,7 @@ class CrawlerService
     private int $maxDepth;
     private int $delayMs;
     private bool $dedupShape;
+    private bool $useSitemap;
     /** @var string[] */
     private array $shapeIdPrefixes;
     /** @var string[] */
@@ -28,6 +29,7 @@ class CrawlerService
         $this->maxDepth = (int) $this->env('CRAWL_MAX_DEPTH', '10');
         $this->delayMs = (int) $this->env('CRAWL_DELAY_MS', '1000');
         $this->dedupShape = $this->env('CRAWL_DEDUP_SHAPE', '1') !== '0';
+        $this->useSitemap = $this->env('CRAWL_SITEMAP', '1') !== '0';
         $this->shapeIdPrefixes = $this->segments('CRAWL_SHAPE_ID_PREFIXES');
         $this->shapeIdParents = $this->segments('CRAWL_SHAPE_MASK_AFTER');
     }
@@ -64,13 +66,27 @@ class CrawlerService
         ?callable $isExcluded = null
     ): array
     {
+        /** @var array<string, bool> $visited */
         $visited = [];
         $pages = [];
         $seenShapes = [];
+        $seenCanonicals = [];
         $queue = [['url' => rtrim($rootUrl, '/'), 'depth' => 0]];
         $baseHost = parse_url($rootUrl, PHP_URL_HOST);
         $siteAuthority = $this->authorityOf($rootUrl);
         $totalQueued = 1;
+
+        // Un sitemap (declare dans robots.txt ou a la racine) est une source de
+        // pages au meme titre que le maillage interne : il trouve les pages
+        // profondes que le crawl ne visite pas, et ne suit pas les filtres.
+        if ($this->useSitemap) {
+            foreach ($this->sitemapUrls($rootUrl, $cookieHeader, $isExcluded) as $sitemapUrl) {
+                if (!isset($visited[$sitemapUrl])) {
+                    $queue[] = ['url' => $sitemapUrl, 'depth' => 0];
+                    $totalQueued++;
+                }
+            }
+        }
 
         while (!empty($queue) && count($pages) < $this->maxPages) {
             if ($shouldStop && $shouldStop()) {
@@ -151,6 +167,21 @@ class CrawlerService
                     $visited[$currentUrl] = true;
                 }
 
+                // Une page dont l'URL est deja le canonical d'une autre est le
+                // meme contenu : la garder ferait auditer deux fois la meme page.
+                if (isset($seenCanonicals[$currentUrl])) {
+                    if ($onPageFound) {
+                        $onPageFound([
+                            'url' => $currentUrl,
+                            'status' => $statusCode,
+                            'skipped' => true,
+                            'reason' => 'duplicate_canonical',
+                            'representedBy' => $seenCanonicals[$currentUrl],
+                        ]);
+                    }
+                    continue;
+                }
+
                 // Une page par forme : les variantes de filtre, de pagination ou
                 // d'identifiant sont annoncées et rattachées à leur représentante.
                 if ($this->dedupShape) {
@@ -195,6 +226,32 @@ class CrawlerService
                     'canonical' => $this->extractCanonical($body),
                     'links' => $this->extractInternalLinks($body, $baseHost, $isExcluded, $rootUrl),
                 ];
+
+                // Le canonical designe le contenu de reference : deux URLs qui
+                // le partagent ne doivent produire qu'une seule page auditée.
+                $canonical = $page['canonical'] !== null ? $this->resolveUrl($page['canonical'], $currentUrl) : null;
+                if ($canonical !== null && $this->authorityOf($canonical) === $siteAuthority) {
+                    $page['canonical'] = $canonical;
+
+                    if ($canonical !== $currentUrl && isset($seenCanonicals[$canonical])) {
+                        if ($onPageFound) {
+                            $onPageFound([
+                                'url' => $currentUrl,
+                                'status' => $statusCode,
+                                'skipped' => true,
+                                'reason' => 'duplicate_canonical',
+                                'representedBy' => $seenCanonicals[$canonical],
+                            ]);
+                        }
+                        continue;
+                    }
+
+                    // La revendication vaut aussi quand la page est sa propre
+                    // reference : une page qui se declare canonical doit etre
+                    // celle gardee, pas la suivante qui la cite.
+                    $seenCanonicals[$canonical] ??= $currentUrl;
+                }
+
                 $pages[] = $page;
 
                 foreach ($page['links'] as $link) {
@@ -229,6 +286,140 @@ class CrawlerService
         }
 
         return $pages;
+    }
+
+    /**
+     * URLs declarees par le sitemap du site : robots.txt d'abord, puis le
+     * sitemap.xml par defaut. Un index de sitemaps est suivi, sous la limite
+     * CRAWL_SITEMAP_MAX_FILES. Toute erreur rend une liste vide : un sitemap
+     * absent ne doit pas faire echouer le crawl.
+     *
+     * @param callable|null $isExcluded function(string $url): bool
+     * @return list<string>
+     */
+    private function sitemapUrls(string $rootUrl, ?string $cookieHeader, ?callable $isExcluded): array
+    {
+        $origin = $this->originOf($rootUrl);
+        $siteAuthority = $this->authorityOf($rootUrl);
+        $headers = [
+            'User-Agent' => ($_ENV['CRAWL_USER_AGENT'] ?? 'optisight-bot/1.0'),
+        ];
+        if ($cookieHeader !== null) {
+            $headers['Cookie'] = $cookieHeader;
+        }
+
+        $maps = [];
+        $robots = $this->fetch($origin . '/robots.txt', $headers);
+        if ($robots !== null && preg_match_all('/^\s*Sitemap:\s*(\S+)\s*$/im', $robots, $m)) {
+            foreach ($m[1] as $declared) {
+                $maps[] = trim($declared);
+            }
+        }
+        if ($maps === []) {
+            $maps[] = $origin . '/sitemap.xml';
+        }
+
+        $maxFiles = max(1, (int) $this->env('CRAWL_SITEMAP_MAX_FILES', '10'));
+        $urls = [];
+        $fetched = [];
+
+        while ($maps !== [] && count($fetched) < $maxFiles) {
+            $mapUrl = array_shift($maps);
+            if (isset($fetched[$mapUrl])) {
+                continue;
+            }
+            $fetched[$mapUrl] = true;
+
+            $body = $this->fetch($mapUrl, $headers);
+            if ($body === null || !preg_match_all('#<loc>\s*(.*?)\s*</loc>#is', $body, $m)) {
+                continue;
+            }
+
+            foreach ($m[1] as $loc) {
+                $loc = html_entity_decode(trim($loc), ENT_QUOTES | ENT_HTML5);
+                if ($loc === '') {
+                    continue;
+                }
+
+                // Un sitemap index pointe vers d'autres sitemaps, pas des pages.
+                if (str_ends_with($loc, '.xml') || str_ends_with($loc, '.xml.gz')) {
+                    $maps[] = $loc;
+                    continue;
+                }
+
+                if ($this->authorityOf($loc) !== $siteAuthority) {
+                    continue;
+                }
+
+                $normalized = rtrim($loc, '/');
+                if ($isExcluded && $isExcluded($normalized)) {
+                    continue;
+                }
+                $urls[] = $normalized;
+            }
+        }
+
+        return array_values(array_unique($urls));
+    }
+
+    /** @param array<string, string> $headers */
+    private function fetch(string $url, array $headers): ?string
+    {
+        try {
+            $response = $this->http->request('GET', $url, [
+                'timeout' => 10,
+                'max_redirects' => 3,
+                'headers' => $headers,
+            ]);
+
+            if ($response->getStatusCode() >= 400) {
+                return null;
+            }
+
+            return $response->getContent(false);
+        } catch (\Exception $e) {
+            $this->logger->warning('Fetch failed for URL: ' . $url, ['error' => $e->getMessage()]);
+            return null;
+        }
+    }
+
+    /** Origine d'une URL : schema, hote et port. */
+    private function originOf(string $url): string
+    {
+        $scheme = parse_url($url, PHP_URL_SCHEME) ?: 'https';
+        $host = (string) parse_url($url, PHP_URL_HOST);
+        $port = parse_url($url, PHP_URL_PORT);
+
+        return $scheme . '://' . $host . ($port !== null ? ':' . $port : '');
+    }
+
+    /** Resout une URL absolue, racine-reliee ou relative contre une page. */
+    private function resolveUrl(string $href, string $base): string
+    {
+        $href = trim($href);
+        if ($href === '') {
+            return $base;
+        }
+
+        if (preg_match('#^https?://#i', $href)) {
+            return $href;
+        }
+
+        $scheme = parse_url($base, PHP_URL_SCHEME) ?: 'https';
+        $host = (string) parse_url($base, PHP_URL_HOST);
+        $port = parse_url($base, PHP_URL_PORT);
+
+        if (str_starts_with($href, '//')) {
+            return $scheme . ':' . $href;
+        }
+        if (str_starts_with($href, '/')) {
+            return $scheme . '://' . $host . ($port !== null ? ':' . $port : '') . $href;
+        }
+
+        $path = (string) parse_url($base, PHP_URL_PATH);
+        $directory = substr($path, 0, (int) strrpos($path, '/') + 1);
+
+        return $scheme . '://' . $host . ($port !== null ? ':' . $port : '') . $directory . $href;
     }
 
     private function extractTitle(string $html): ?string

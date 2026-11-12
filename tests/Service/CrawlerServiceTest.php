@@ -21,6 +21,9 @@ class CrawlerServiceTest extends TestCase
         $_ENV['CRAWL_MAX_PAGES'] = 50;
         $_ENV['CRAWL_DEDUP_SHAPE'] = '1';
         $_ENV['CRAWL_SHAPE_ID_PREFIXES'] = '';
+        // Le sitemap ferait une requete de plus avant chaque crawl : les tests
+        // existants ordonnent leurs reponses, on le laisse a son test dedie.
+        $_ENV['CRAWL_SITEMAP'] = '0';
     }
 
     public function testItKeepsTheUrlThatServesThePageWhenTheRootRedirects(): void
@@ -220,6 +223,60 @@ class CrawlerServiceTest extends TestCase
             ['https://xolo.test/orgs', 'https://xolo.test/orgs/acme/admin'],
             array_column($pages, 'url')
         );
+    }
+
+    public function testItSeedsTheCrawlFromTheSitemapDeclaredInRobots(): void
+    {
+        $_ENV['CRAWL_SITEMAP'] = '1';
+        $_ENV['CRAWL_DEDUP_SHAPE'] = '0';
+
+        $requested = [];
+        $client = new MockHttpClient(function (string $method, string $url) use (&$requested): MockResponse {
+            $requested[] = $url;
+
+            return match ($url) {
+                'https://xolo.test/robots.txt' => new MockResponse("User-agent: *\nSitemap: https://xolo.test/sitemap.xml\n"),
+                'https://xolo.test/sitemap.xml' => new MockResponse('<urlset><url><loc>https://xolo.test/deep</loc></url></urlset>'),
+                'https://xolo.test' => new MockResponse('<html lang="fr"><title>Accueil</title></html>', ['response_headers' => ['content-type' => 'text/html']]),
+                default => new MockResponse('<html lang="fr"><title>Profond</title></html>', ['response_headers' => ['content-type' => 'text/html']]),
+            };
+        });
+
+        $pages = (new CrawlerService($client, new NullLogger()))->crawl('https://xolo.test/');
+
+        $this->assertSame(['https://xolo.test/robots.txt', 'https://xolo.test/sitemap.xml'], array_slice($requested, 0, 2));
+        $this->assertSame(
+            ['https://xolo.test', 'https://xolo.test/deep'],
+            array_column($pages, 'url')
+        );
+    }
+
+    public function testItKeepsOnePageWhenAnotherDeclaresItAsItsCanonical(): void
+    {
+        $_ENV['CRAWL_DEDUP_SHAPE'] = '0';
+
+        $found = [];
+        $crawler = $this->crawler([
+            new MockResponse(
+                '<html lang="fr"><title>Accueil</title><link rel="canonical" href="https://xolo.test/"><a href="/dup">Dup</a></html>',
+                ['response_headers' => ['content-type' => 'text/html']]
+            ),
+            new MockResponse(
+                '<html lang="fr"><title>Dup</title><link rel="canonical" href="https://xolo.test/"></html>',
+                ['response_headers' => ['content-type' => 'text/html']]
+            ),
+        ]);
+
+        $pages = $crawler->crawl('https://xolo.test/', onPageFound: function (array $page) use (&$found): void {
+            $found[] = $page;
+        });
+
+        $this->assertSame(['https://xolo.test'], array_column($pages, 'url'));
+
+        $skipped = array_values(array_filter($found, static fn (array $p): bool => ($p['reason'] ?? '') === 'duplicate_canonical'));
+        $this->assertCount(1, $skipped);
+        $this->assertSame('https://xolo.test/dup', $skipped[0]['url']);
+        $this->assertSame('https://xolo.test', $skipped[0]['representedBy']);
     }
 
     /**

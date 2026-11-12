@@ -53,6 +53,26 @@ class McpController extends AbstractController
         McpApiKeyRepository $apiKeyRepository,
         EntityManagerInterface $em
     ): void {
+        // ─── Guide ────────────────────────────────────────────────────────────
+        // Le guide est enregistre le premier : tools/list suit l'ordre
+        // d'enregistrement, et un agent qui decouvre la surface doit la voir
+        // avant les outils qu'elle decrit.
+        $this->server->registerTool('optisight.guide', function ($args, $token) use ($guideResource) {
+            $apiKey = $this->authenticator->authenticate($token);
+            if (!$apiKey || !$apiKey->hasPermission('guide')) {
+                throw new \Exception('Permission denied: guide');
+            }
+            return $guideResource->get($args, $apiKey);
+        }, [
+            'description' => 'How to drive this MCP surface: the loop, the tools, the traps and the recipes. Read this first.',
+            'inputSchema' => [
+                'type' => 'object',
+                'properties' => [
+                    'topic' => ['type' => 'string', 'description' => 'Only the sections whose title contains this word'],
+                ],
+            ],
+        ]);
+
         $this->server->registerTool('optisight.sites.list', function ($args, $token) use ($siteResource) {
             $apiKey = $this->authenticator->authenticate($token);
             if (!$apiKey || !$apiKey->hasPermission('sites.list')) {
@@ -334,19 +354,20 @@ class McpController extends AbstractController
             ],
         ]);
 
-        $this->server->registerTool('optisight.guide', function ($args, $token) use ($guideResource) {
+        $this->server->registerTool('optisight.audit.health', function ($args, $token) use ($auditResource) {
             $apiKey = $this->authenticator->authenticate($token);
-            if (!$apiKey || !$apiKey->hasPermission('guide')) {
-                throw new \Exception('Permission denied: guide');
+            if (!$apiKey || !$apiKey->hasPermission('audits.get')) {
+                throw new \Exception('Permission denied: audits.get');
             }
-            return $guideResource->get($args, $apiKey);
+            return $auditResource->health($args, $apiKey);
         }, [
-            'description' => 'How to drive this MCP surface: the loop, the tools, the traps and the recipes',
+            'description' => 'Reliability verdict for a run: pages analysed against the expected count, pages missing from either engine, HTTP errors — read it before trusting a score',
             'inputSchema' => [
                 'type' => 'object',
                 'properties' => [
-                    'topic' => ['type' => 'string', 'description' => 'Only the sections whose title contains this word'],
+                    'auditId' => ['type' => 'integer', 'description' => 'Audit ID'],
                 ],
+                'required' => ['auditId'],
             ],
         ]);
     }

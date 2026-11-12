@@ -280,6 +280,133 @@ class AuditMcpResource
     }
 
     /**
+     * Verdict de fiabilite d'une analyse : ce qu'on peut croire, et ce qui manque.
+     *
+     * Un score vert ne veut rien dire si la moitie des pages n'a pas repondu, si
+     * un moteur a rendu un rapport vide, ou si le run s'est arrete en cours de
+     * route : c'est ce controle qui autorise a lire les scores.
+     *
+     * @param array<string, mixed> $arguments
+     * @return array<string, mixed>
+     */
+    public function health(array $arguments, ?McpApiKey $apiKey): array
+    {
+        $auditId = $arguments['auditId'] ?? null;
+
+        if (!$auditId) {
+            throw new \InvalidArgumentException('auditId is required');
+        }
+
+        $analysis = $this->analysisRepository->find($auditId);
+
+        if (!$analysis) {
+            throw new \InvalidArgumentException("Audit not found: {$auditId}");
+        }
+
+        $reports = $this->pageReportRepository->findBy(['analysis' => $analysis]);
+
+        $lighthouseMissing = [];
+        $pa11yMissing = [];
+        $httpErrors = [];
+
+        foreach ($reports as $report) {
+            $url = $report->getUrl() ?? '';
+
+            $hasLighthouse = $report->getLhPerformance() !== null
+                || $report->getLhAccessibility() !== null
+                || $report->getLhSeo() !== null
+                || $report->getLhBestPractices() !== null;
+            if (!$hasLighthouse) {
+                $lighthouseMissing[] = $url;
+            }
+
+            if ($report->getRgaaScore() === null) {
+                $pa11yMissing[] = $url;
+            }
+
+            $status = $report->getHttpStatus();
+            if ($status !== null && ($status < 200 || $status >= 400)) {
+                $httpErrors[] = ['url' => $url, 'status' => $status];
+            }
+        }
+
+        $total = $analysis->getTotalPages();
+        $analysed = count($reports);
+        $status = (string) $analysis->getStatus();
+        $terminal = in_array($status, [Analysis::STATUS_COMPLETED, Analysis::STATUS_FAILED, Analysis::STATUS_CANCELLED], true);
+
+        $complete = $status === Analysis::STATUS_COMPLETED
+            && $total > 0
+            && $analysed >= $total
+            && $lighthouseMissing === []
+            && $pa11yMissing === [];
+        $pass = $complete && $httpErrors === [];
+
+        return [
+            'auditId' => (int) $analysis->getId(),
+            'status' => $status,
+            'terminal' => $terminal,
+            'siteId' => $analysis->getSite()?->getId(),
+            'siteName' => $analysis->getSite()?->getName(),
+            'errorMessage' => $analysis->getErrorMessage(),
+            'pages' => [
+                'total' => $total,
+                'analysed' => $analysed,
+                'missing' => max(0, $total - $analysed),
+            ],
+            'engines' => [
+                'lighthouse' => [
+                    'analysed' => $analysed - count($lighthouseMissing),
+                    'missing' => count($lighthouseMissing),
+                    'urls' => $lighthouseMissing,
+                ],
+                'pa11y' => [
+                    'analysed' => $analysed - count($pa11yMissing),
+                    'missing' => count($pa11yMissing),
+                    'urls' => $pa11yMissing,
+                ],
+            ],
+            'httpErrors' => $httpErrors,
+            'pass' => $pass,
+            'summary' => $this->healthSummary($status, $total, $analysed, $lighthouseMissing, $pa11yMissing, $httpErrors, $pass),
+        ];
+    }
+
+    /**
+     * @param list<string> $lighthouseMissing
+     * @param list<string> $pa11yMissing
+     * @param list<array{url: string, status: int}> $httpErrors
+     */
+    private function healthSummary(
+        string $status,
+        int $total,
+        int $analysed,
+        array $lighthouseMissing,
+        array $pa11yMissing,
+        array $httpErrors,
+        bool $pass
+    ): string {
+        $summary = sprintf('%d/%d page(s) analysée(s), statut %s', $analysed, $total, $status);
+
+        $problems = [];
+        if (count($lighthouseMissing) > 0) {
+            $problems[] = sprintf('%d sans Lighthouse', count($lighthouseMissing));
+        }
+        if (count($pa11yMissing) > 0) {
+            $problems[] = sprintf('%d sans Pa11y', count($pa11yMissing));
+        }
+        if ($httpErrors !== []) {
+            $problems[] = sprintf('%d en erreur HTTP', count($httpErrors));
+        }
+
+        if ($problems !== []) {
+            $summary .= ' — ' . implode(', ', $problems);
+        }
+
+        return $summary . ($pass ? ' : fiable.' : ' : résultat à prendre avec des pincettes.');
+    }
+
+    /**
      * Aplati les rapports en une liste de nœuds en echec (un par constat).
      *
      * @param array<int, PageReport> $reports
