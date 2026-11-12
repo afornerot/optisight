@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\Entity\PageReport;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Psr\Log\LoggerInterface;
 
@@ -37,6 +38,34 @@ class AiService
         return !empty($this->apiKey) && $this->apiKey !== 'changeme';
     }
 
+    /**
+     * Données d'une page pour l'analyse IA : une seule construction, partagée
+     * par l'écran d'analyse de page et par le tool MCP. Deux copies avaient
+     * divergé — le tool oubliait le rapport pa11y, et l'indicateur RGAA
+     * annonçait « aucune erreur » sur une page qui en avait des dizaines.
+     *
+     * @return array<string, mixed>
+     */
+    public static function pageData(PageReport $report): array
+    {
+        return [
+            'url' => $report->getUrl(),
+            'lhPerformance' => $report->getLhPerformance(),
+            'lhAccessibility' => $report->getLhAccessibility(),
+            'lhSeo' => $report->getLhSeo(),
+            'lhBestPractices' => $report->getLhBestPractices(),
+            'rgaaScore' => $report->getRgaaScore(),
+            'rgaaErrors' => $report->getRgaaErrors() ?? [],
+            'rgaaWarnings' => $report->getRgaaWarnings() ?? [],
+            'seoTitle' => $report->getSeoTitle(),
+            'seoDescription' => $report->getSeoDescription(),
+            'seoH1Count' => $report->getSeoH1Count(),
+            'seoCanonical' => $report->getSeoCanonical(),
+            'lighthouseReport' => $report->getLighthouseReport(),
+            'pa11yReport' => $report->getPa11yReport(),
+        ];
+    }
+
     // ── Per-page analysis by indicator ──
 
     public function analyzePageByIndicator(array $pageData, string $indicator): ?array
@@ -44,6 +73,8 @@ class AiService
         if (!$this->isConfigured()) {
             return null;
         }
+
+        $this->assertIndicator($indicator);
 
         $url = $pageData['url'] ?? '';
         $prompt = $this->buildPagePrompt($pageData, $indicator);
@@ -60,6 +91,7 @@ class AiService
             'seo' => "Tu es un expert en SEO (référencement naturel). Analyse UNIQUEMENT les problèmes SEO. Réponds toujours en JSON valide. Pas de markdown, pas de backticks.",
             'bonnes_pratiques' => "Tu es un expert en bonnes pratiques web. Analyse UNIQUEMENT les problèmes de bonnes pratiques Lighthouse. Réponds toujours en JSON valide. Pas de markdown, pas de backticks.",
             'rgaa' => "Tu es un expert en accessibilité web (RGAA 4.1). Analyse UNIQUEMENT les erreurs et avertissements RGAA/pa11y. Réponds toujours en JSON valide. Pas de markdown, pas de backticks.",
+            default => "Tu es un expert du web. Réponds toujours en JSON valide. Pas de markdown, pas de backticks.",
         };
 
         return $this->callLlm($prompt, $systemMessage, 4096);
@@ -242,6 +274,8 @@ PROMPT;
             return null;
         }
 
+        $this->assertIndicator($indicator);
+
         $prompt = $this->buildGlobalPrompt($pagesData, $indicator);
 
         $indicatorLabel = self::INDICATOR_LABELS[$indicator] ?? $indicator;
@@ -257,6 +291,7 @@ PROMPT;
             'seo' => "Tu es un expert en SEO. Analyse UNIQUEMENT les problèmes SEO du site. Réponds toujours en JSON valide. Pas de markdown, pas de backticks.",
             'bonnes_pratiques' => "Tu es un expert en bonnes pratiques web. Analyse UNIQUEMENT les problèmes de bonnes pratiques du site. Réponds toujours en JSON valide. Pas de markdown, pas de backticks.",
             'rgaa' => "Tu es un expert en accessibilité web (RGAA 4.1). Analyse UNIQUEMENT les erreurs RGAA/pa11y du site. Réponds toujours en JSON valide. Pas de markdown, pas de backticks.",
+            default => "Tu es un expert du web. Réponds toujours en JSON valide. Pas de markdown, pas de backticks.",
         };
 
         return $this->callLlm($prompt, $systemMessage, 8192);
@@ -382,12 +417,23 @@ PROMPT;
 
     // ── Shared LLM call with retry ──
 
+    /**
+     * Un indicateur inconnu ferait tomber le match sans default sur un
+     * UnhandledMatchError (un \Error, que les appelants n attrapent pas).
+     */
+    private function assertIndicator(string $indicator): void
+    {
+        if (!in_array($indicator, self::INDICATORS, true)) {
+            throw new \InvalidArgumentException(sprintf('Unknown indicator: %s', $indicator));
+        }
+    }
+
     private function callLlm(string $prompt, string $systemMessage, int $maxTokens): ?array
     {
         $this->logger->info('AI LLM call starting', ['prompt_length' => mb_strlen($prompt), 'max_tokens' => $maxTokens]);
 
         $maxRetries = 3;
-        $retryDelay = 2000000;
+        $retryDelay = $this->retryDelayMs() * 1000;
         $timeout = 180;
 
         for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
@@ -409,19 +455,58 @@ PROMPT;
                     'timeout' => $timeout,
                 ]);
 
-                $this->logger->info('AI HTTP request completed', ['attempt' => $attempt]);
+                // Le statut est lu avant le corps : toArray(false) avalait un
+                // 429 sans le dire, et l echec partait sans reprise.
+                $status = $response->getStatusCode();
+                $body = $response->getContent(false);
 
-                $data = $response->toArray(false);
+                $this->logger->info('AI HTTP request completed', ['attempt' => $attempt, 'status' => $status]);
+
+                if ($status === 429 || $status >= 500) {
+                    $this->logger->warning('AI call throttled, will retry', [
+                        'attempt' => $attempt,
+                        'status' => $status,
+                        'body' => mb_substr($body, 0, 500),
+                    ]);
+
+                    if ($attempt < $maxRetries) {
+                        usleep($retryDelay);
+                        $retryDelay *= 2;
+                        continue;
+                    }
+
+                    return null;
+                }
+
+                if ($status < 200 || $status >= 300) {
+                    $this->logger->error('AI call rejected', [
+                        'status' => $status,
+                        'body' => mb_substr($body, 0, 500),
+                    ]);
+                    return null;
+                }
+
+                $data = json_decode($body, true);
+                if (!is_array($data)) {
+                    $this->logger->warning('AI response is not JSON', ['body' => mb_substr($body, 0, 500)]);
+                    return null;
+                }
+
                 $content = $data['choices'][0]['message']['content'] ?? null;
 
-                if (!$content) {
-                    $this->logger->warning('AI response content is empty');
+                if (!is_string($content) || trim($content) === '') {
+                    $this->logger->warning('AI response content is empty', [
+                        'model' => $data['model'] ?? $this->model,
+                        'usage' => $data['usage'] ?? null,
+                    ]);
                     return null;
                 }
 
                 $content = trim($content);
 
                 $this->logger->info('AI response received', [
+                    'model' => $data['model'] ?? $this->model,
+                    'usage' => $data['usage'] ?? null,
                     'length' => mb_strlen($content),
                 ]);
 
@@ -430,13 +515,13 @@ PROMPT;
                     $content = preg_replace('/\s*```$/', '', $content);
                 }
 
-                $result = json_decode($content, true);
+                $result = json_decode((string) $content, true);
 
                 if (json_last_error() !== JSON_ERROR_NONE) {
                     $this->logger->warning('AI JSON parse failed, trying regex fallback', [
                         'json_error' => json_last_error_msg(),
                     ]);
-                    if (preg_match('/\{[\s\S]*\}/', $content, $matches)) {
+                    if (preg_match('/\{[\s\S]*\}/', (string) $content, $matches)) {
                         $result = json_decode($matches[0], true);
                     }
                 }
@@ -487,6 +572,21 @@ PROMPT;
         }
 
         return null;
+    }
+
+    /**
+     * Délai avant reprise, en millisecondes. Réglable pour que les tests ne
+     * dorment pas deux secondes sur un 429 simulé.
+     */
+    private function retryDelayMs(): int
+    {
+        $value = $_ENV['AI_RETRY_DELAY_MS'] ?? getenv('AI_RETRY_DELAY_MS');
+
+        if ($value === false || $value === '') {
+            return 2000;
+        }
+
+        return max(0, (int) $value);
     }
 
     // ── Helpers ──

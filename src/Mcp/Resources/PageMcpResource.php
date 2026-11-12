@@ -159,22 +159,10 @@ class PageMcpResource
             throw new \InvalidArgumentException("Page not found: {$pageId}");
         }
 
-        $pageData = [
-            'url' => $report->getUrl(),
-            'lhPerformance' => $report->getLhPerformance(),
-            'lhAccessibility' => $report->getLhAccessibility(),
-            'lhSeo' => $report->getLhSeo(),
-            'lhBestPractices' => $report->getLhBestPractices(),
-            'rgaaScore' => $report->getRgaaScore(),
-            'seoTitle' => $report->getSeoTitle(),
-            'seoDescription' => $report->getSeoDescription(),
-            'seoH1Count' => $report->getSeoH1Count(),
-            'seoCanonical' => $report->getSeoCanonical(),
-            'lighthouseReport' => $report->getLighthouseReport(),
-        ];
+        $pageData = AiService::pageData($report);
 
         $results = [];
-        $indicators = \App\Service\AiService::INDICATORS;
+        $indicators = AiService::INDICATORS;
 
         foreach ($indicators as $indicator) {
             $result = $this->aiService->analyzePageByIndicator($pageData, $indicator);

@@ -246,7 +246,7 @@ class McpController extends AbstractController
             }
             return $aiResource->trigger($args, $apiKey);
         }, [
-            'description' => 'Trigger AI summary generation for an audit',
+            'description' => 'Start the AI synthesis of a completed audit in the background (five model calls); read it back with optisight.ai.summary',
             'inputSchema' => [
                 'type' => 'object',
                 'properties' => [

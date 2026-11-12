@@ -18,7 +18,9 @@ audit.get             → poll until the status is terminal
 audit.health          → check the run is trustworthy before reading any score
 audit.findings        → the findings, grouped, worst leverage first
 page.inspect          → the measured facts behind one finding
-page.ai_analyze       → optional, on demand: a hypothesis about the cause
+page.ai_analyze       → optional, on demand: a hypothesis about the cause of one page
+ai.trigger            → optional: the audit-wide synthesis, started in the background
+ai.summary            → read that synthesis back once it lands
 audit.compare         → what a change fixed, broke, or left alone
 ```
 
@@ -57,7 +59,13 @@ or at the root — before walking the internal links, and keeps one page per
 | `optisight.page.get` | `pageId` | one page: scores, counts, its crawl metadata |
 | `optisight.page.inspect` | `pageId`, `selector` or `rule`+`index` | the node and its **measured** facts: snippet, computed colour, background, opacity, contrast ratio, target size, associated label |
 | `optisight.page.analyze` | `pageId` | re-runs both engines on that page and updates its report |
-| `optisight.page.ai_analyze` | `pageId`, `indicator`, `rule?`, `selector?` | a model's reading of that page, focused on one rule when given |
+| `optisight.page.ai_analyze` | `pageId` | a model's reading of that page, one summary per indicator — five model calls in a single request, so it is slow |
+| `optisight.ai.trigger` | `auditId` | starts `app:ai` detached on a **completed** audit; returns the log path. Poll `ai.summary` for the result |
+| `optisight.ai.summary` | `auditId` | the audit-wide synthesis (per indicator) and its consolidated recommendations, or `hasSummary: false` |
+
+The AI tools are inert until `AI_API_KEY` is set to a real key (the shipped
+value is `changeme`): `ai.trigger` then does nothing and `ai.summary` answers
+`hasSummary: false`.
 
 ## Traps worth knowing
 

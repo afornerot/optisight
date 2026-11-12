@@ -545,7 +545,7 @@ class AnalysisController extends AbstractController
         $results = [];
         foreach (\App\Service\AiService::INDICATORS as $indicator) {
             $result = $this->ai->analyzePageByIndicator($pageData, $indicator);
-            $results[$indicator] = $result ?? ['analysis' => '', 'recommendations' => []];
+            $results[$indicator] = $result ?? ['summary' => '', 'recommendations' => []];
         }
         $report->setAiAnalysis($results);
         $report->setAiAnalysisAt(new \DateTimeImmutable());
@@ -649,21 +649,6 @@ class AnalysisController extends AbstractController
 
     private function buildPageData(PageReport $report): array
     {
-        return [
-            'url' => $report->getUrl(),
-            'lhPerformance' => $report->getLhPerformance(),
-            'lhAccessibility' => $report->getLhAccessibility(),
-            'lhSeo' => $report->getLhSeo(),
-            'lhBestPractices' => $report->getLhBestPractices(),
-            'rgaaScore' => $report->getRgaaScore(),
-            'rgaaErrors' => $report->getRgaaErrors() ?? [],
-            'rgaaWarnings' => $report->getRgaaWarnings() ?? [],
-            'seoTitle' => $report->getSeoTitle(),
-            'seoDescription' => $report->getSeoDescription(),
-            'seoH1Count' => $report->getSeoH1Count(),
-            'seoCanonical' => $report->getSeoCanonical(),
-            'lighthouseReport' => $report->getLighthouseReport(),
-            'pa11yReport' => $report->getPa11yReport(),
-        ];
+        return AiService::pageData($report);
     }
 }

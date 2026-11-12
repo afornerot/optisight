@@ -65,3 +65,8 @@ services:
   App\Mcp\Resources\GuideMcpResource:
     arguments:
       $projectDir: '%kernel.project_dir%'
+
+  # `ai.trigger` détache `app:ai` : il lui faut le chemin de bin/console.
+  App\Mcp\Resources\AiMcpResource:
+    arguments:
+      $projectDir: '%kernel.project_dir%'
